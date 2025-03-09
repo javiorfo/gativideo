@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/javiorfo/steams"
 )
 
 type Movie struct {
@@ -16,12 +17,43 @@ type Movie struct {
 	Torrents []Torrent
 }
 
+func (m Movie) GetTorrent(quality string) Torrent {
+	return steams.OfSlice(m.Torrents).Filter(func(t Torrent) bool {
+		switch quality {
+		case "2160":
+			if strings.Contains(t.File, "2160") {
+				return true
+			}
+			fallthrough
+		case "1080":
+			if strings.Contains(t.File, "1080") {
+				return true
+			}
+			fallthrough
+		case "720":
+			if strings.Contains(t.File, "720") {
+				return true
+			}
+		}
+		return false
+	}).FindFirst().OrElseGet(torrentNotFound)
+}
+
 type Torrent struct {
 	File       string
 	Size       string
 	Resolution string
 	Duration   string
 	Language   string
+}
+
+func torrentNotFound() Torrent {
+	return Torrent{
+		Size:       "Unknown",
+		Resolution: "Unknown",
+		Duration:   "Unknown",
+		Language:   "Unknown",
+	}
 }
 
 func GetMovies(host, keyword, quality, genre, rating, year, order string, page int) (int, []Movie) {
@@ -60,22 +92,20 @@ func GetMovies(host, keyword, quality, genre, rating, year, order string, page i
 		movie := Movie{
 			Name:     strings.TrimSpace(data[0]),
 			Year:     strings.TrimSpace(data[1]),
-			Genre:    strings.ReplaceAll(strings.TrimSpace(data[2]), "\\u00a0", ""),
+			Genre:    strings.TrimSpace(data[2]),
 			Rate:     strings.TrimSpace(data[len(data)-1]),
 			Torrents: torrents,
 		}
 		movies = append(movies, movie)
 	})
 
-	// 	c.OnHTML("div.browse-movie-bottom", func(e *colly.HTMLElement) {
-    var total int
+	var total int
 	c.OnHTML("div.browse-content", func(e *colly.HTMLElement) {
-        total, _ = strconv.Atoi(e.ChildText("div h2 b"))
+		total, _ = strconv.Atoi(e.ChildText("div h2 b"))
 		movies := e.ChildAttrs("div section div div a.browse-movie-title", "href")
 		for _, v := range movies {
 			e.Request.Visit(v)
 		}
-		// 		e.Request.Visit(e.ChildAttr("div section div div a.browse-movie-title", "href"))
 	})
 
 	c.Visit(fmt.Sprintf("%s/browse-movies?keyword=%s&quality=%s&genre=%s&rating=%s&year=%s&order_by=%s&page=%d", host, keyword, quality, genre, rating, year, order, page))

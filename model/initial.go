@@ -1,0 +1,103 @@
+package model
+
+import (
+	"math"
+
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.ThickBorder()).
+	BorderForeground(lipgloss.Color("240"))
+
+func InitialModel() model {
+	ti := textinput.New()
+	ti.Placeholder = "Search movie..."
+	ti.Focus()
+	ti.CharLimit = 100
+	ti.Width = 70
+
+	columns := []table.Column{
+		{Title: "YEAR", Width: 5},
+		{Title: "NAME", Width: 50},
+		{Title: "SIZE", Width: 10},
+		{Title: "GENRE", Width: 35},
+		{Title: "RATE", Width: 4},
+		{Title: "DURATION", Width: 12},
+		{Title: "RESOLUTION", Width: 10},
+		{Title: "LANGUAGE", Width: 12},
+	}
+
+	total, rows := getRows("", 1)
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(21),
+		table.WithKeyMap(table.KeyMap{
+			LineUp: key.NewBinding(
+				key.WithKeys("up"),
+				key.WithHelp("↑/k", "up"),
+			),
+			LineDown: key.NewBinding(
+				key.WithKeys("down"),
+				key.WithHelp("↓ ", "down"),
+			),
+			PageUp: key.NewBinding(
+				key.WithKeys("pgup"),
+				key.WithHelp("pgup", "page up"),
+			),
+			PageDown: key.NewBinding(
+				key.WithKeys("pgdown"),
+				key.WithHelp("pgdn", "page down"),
+			),
+			HalfPageUp: key.NewBinding(
+				key.WithKeys("ctrl+u"),
+				key.WithHelp("u", "½ page up"),
+			),
+			HalfPageDown: key.NewBinding(
+				key.WithKeys("ctrl+d"),
+				key.WithHelp("d", "½ page down"),
+			),
+			GotoTop: key.NewBinding(
+				key.WithKeys("home"),
+				key.WithHelp("home", "go to start"),
+			),
+			GotoBottom: key.NewBinding(
+				key.WithKeys("end"),
+				key.WithHelp("end", "go to end"),
+			),
+		}),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(true)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("15")).
+		Background(lipgloss.Color("240")).
+		Bold(false)
+	t.SetStyles(s)
+
+	totalPages := 1
+	if total > 20 {
+		totalPages = int(math.Ceil(float64(total) / float64(20)))
+	}
+
+	return model{
+		table:        t,
+		textInput:    ti,
+		filterText:   "",
+		total:        total,
+		page:         1,
+		totalPages:   totalPages,
+		filteredRows: rows,
+	}
+}
