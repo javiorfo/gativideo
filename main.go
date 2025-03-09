@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
@@ -22,13 +21,21 @@ type model struct {
 	table        table.Model
 	textInput    textinput.Model
 	filterText   string
-	pages        string
-	total        string
+	total        int
+	page         int
 	filteredRows []table.Row
 }
 
-func getRows(keyword string) (int, []table.Row) {
-	total, movies := yts.GetMovies("https://en.yts-official.mx", keyword, "all", "all", "0", "0", "rating", 1)
+func (m model) totalAndPages() string {
+	total := 1
+	if m.total > 20 {
+		total = m.total / 20
+	}
+	return fmt.Sprintf(" %d movies - Page %d/%d ", m.total, m.page, total)
+}
+
+func getRows(keyword string, page int) (int, []table.Row) {
+	total, movies := yts.GetMovies("https://en.yts-official.mx", keyword, "all", "all", "0", "0", "rating", page)
 	rows := steams.Mapping(steams.OfSlice(movies), func(m yts.Movie) table.Row {
 		torrent := m.Torrents[0]
 		return table.Row{m.Year, m.Name, torrent.Size, m.Genre, m.Rate, torrent.Duration, torrent.Resolution, torrent.Language}
@@ -38,29 +45,29 @@ func getRows(keyword string) (int, []table.Row) {
 
 func initialModel() model {
 	ti := textinput.New()
-	ti.Placeholder = "Filter table..."
+	ti.Placeholder = "Search movie..."
 	ti.Focus()
 	ti.CharLimit = 100
-	ti.Width = 49
+	ti.Width = 70
 
 	columns := []table.Column{
 		{Title: "YEAR", Width: 5},
 		{Title: "NAME", Width: 50},
 		{Title: "SIZE", Width: 10},
-		{Title: "GENRE", Width: 20},
+		{Title: "GENRE", Width: 35},
 		{Title: "RATE", Width: 4},
 		{Title: "DURATION", Width: 12},
 		{Title: "RESOLUTION", Width: 10},
 		{Title: "LANGUAGE", Width: 12},
 	}
 
-	total, rows := getRows("")
+	total, rows := getRows("", 1)
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(21),
 		table.WithKeyMap(table.KeyMap{
 			LineUp: key.NewBinding(
 				key.WithKeys("up"),
@@ -68,15 +75,15 @@ func initialModel() model {
 			),
 			LineDown: key.NewBinding(
 				key.WithKeys("down"),
-				key.WithHelp("↓/j", "down"),
+				key.WithHelp("↓ ", "down"),
 			),
 			PageUp: key.NewBinding(
 				key.WithKeys("pgup"),
-				key.WithHelp("b/pgup", "page up"),
+				key.WithHelp("pgup", "page up"),
 			),
 			PageDown: key.NewBinding(
 				key.WithKeys("pgdown"),
-				key.WithHelp("f/pgdn", "page down"),
+				key.WithHelp("pgdn", "page down"),
 			),
 			HalfPageUp: key.NewBinding(
 				key.WithKeys("ctrl+u"),
@@ -88,11 +95,11 @@ func initialModel() model {
 			),
 			GotoTop: key.NewBinding(
 				key.WithKeys("home"),
-				key.WithHelp("g/home", "go to start"),
+				key.WithHelp("home", "go to start"),
 			),
 			GotoBottom: key.NewBinding(
 				key.WithKeys("end"),
-				key.WithHelp("G/end", "go to end"),
+				key.WithHelp("end", "go to end"),
 			),
 		}),
 	)
@@ -113,8 +120,8 @@ func initialModel() model {
 		table:        t,
 		textInput:    ti,
 		filterText:   "",
-		pages:        fmt.Sprintf("Page 1/%d ", total/20),
-		total:        fmt.Sprintf(" %d movies - ", total),
+		total:        total,
+		page:         1,
 		filteredRows: rows,
 	}
 }
@@ -134,14 +141,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+right":
+			m.filterText = m.textInput.Value()
+			m.page += 1
+			total, rows := getRows(m.filterText, m.page)
+			m.filteredRows = rows
+			m.table.SetRows(m.filteredRows)
+			m.total = total
+
+			return m, cmd
 		case "enter":
 			/* 			return m, tea.Batch(
 				tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
 			) */
 			m.filterText = m.textInput.Value()
-			_, rows := getRows(m.filterText)
+			total, rows := getRows(m.filterText, 1)
 			m.filteredRows = rows
 			m.table.SetRows(m.filteredRows)
+			m.total = total
 
 			return m, cmd
 		}
@@ -154,23 +171,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	/* 	if m.filterText == "" {
-		return baseStyle.Render(m.textInput.View()) + "\n"
-	} */
-	return baseStyle.Render(m.textInput.View()) + "\n" + baseStyle.Render(m.total+m.pages) + "\n" + baseStyle.Render(m.table.View()) + "\n"
-}
-
-func filterRows(rows []table.Row, filterText string) []table.Row {
-	var filteredRows []table.Row
-	for _, row := range rows {
-		for _, cell := range row {
-			if strings.ToLower(lipgloss.NewStyle().Render(cell)) == filterText || strings.Contains(strings.ToLower(lipgloss.NewStyle().Render(cell)), filterText) {
-				filteredRows = append(filteredRows, row)
-				break
-			}
-		}
-	}
-	return filteredRows
+	return baseStyle.Render(m.textInput.View()) + "\n" + baseStyle.Render(m.totalAndPages()) + "\n" + baseStyle.Render(m.table.View()) + "\n"
 }
 
 func main() {
