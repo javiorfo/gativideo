@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/gocolly/colly/v2 v2.1.0
-	github.com/javiorfo/steams v1.3.0
+	github.com/javiorfo/steams v1.4.0
 )
 
 require (

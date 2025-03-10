@@ -18,7 +18,7 @@ type Movie struct {
 }
 
 func (m Movie) GetTorrent(quality string) Torrent {
-	return steams.OfSlice(m.Torrents).Filter(func(t Torrent) bool {
+	return steams.OfSlice(m.Torrents).FindOne(func(t Torrent) bool {
 		switch quality {
 		case "2160":
 			if strings.Contains(t.File, "2160") {
@@ -35,8 +35,8 @@ func (m Movie) GetTorrent(quality string) Torrent {
 				return true
 			}
 		}
-		return false
-	}).FindFirst().OrElseGet(torrentNotFound)
+		return true
+	}).OrElseGet(torrentNotFound)
 }
 
 type Torrent struct {

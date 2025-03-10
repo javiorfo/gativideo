@@ -1,9 +1,10 @@
 package model
 
 import (
-	"math"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
@@ -28,20 +29,17 @@ func InitialModel() model {
 		{Title: "RATE", Width: 4},
 		{Title: "DURATION", Width: 12},
 		{Title: "RESOLUTION", Width: 10},
-		{Title: "LANGUAGE", Width: 12},
+		{Title: "LANGUAGE", Width: 15},
 	}
-
-	total, rows := getRows("", 1)
 
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
 		table.WithFocused(true),
 		table.WithHeight(21),
 		table.WithKeyMap(table.KeyMap{
 			LineUp: key.NewBinding(
 				key.WithKeys("up"),
-				key.WithHelp("↑/k", "up"),
+				key.WithHelp("↑ ", "up"),
 			),
 			LineDown: key.NewBinding(
 				key.WithKeys("down"),
@@ -86,18 +84,16 @@ func InitialModel() model {
 		Bold(false)
 	t.SetStyles(s)
 
-	totalPages := 1
-	if total > 20 {
-		totalPages = int(math.Ceil(float64(total) / float64(20)))
-	}
+	sp := spinner.New()
+	sp.Spinner = spinner.Points
+	sp.Spinner.FPS = time.Second / 4
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 
 	return model{
-		table:        t,
-		textInput:    ti,
-		filterText:   "",
-		total:        total,
-		page:         1,
-		totalPages:   totalPages,
-		filteredRows: rows,
+		table:     t,
+		textInput: ti,
+		spinner:   sp,
+		loading:   true,
+		page:      1,
 	}
 }
