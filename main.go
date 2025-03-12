@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/javiorfo/bitsmuggler/model"
@@ -10,9 +9,7 @@ import (
 
 func main() {
 	m := model.InitialModel()
-	// 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 	if _, err := tea.NewProgram(m).Run(); err != nil {
-		fmt.Println("Error running program:", err)
-		os.Exit(1)
+		log.Fatal("Error running bitsmuggler:", err)
 	}
 }

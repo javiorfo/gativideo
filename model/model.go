@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/javiorfo/bitsmuggler/yts"
+	"github.com/javiorfo/nilo"
 	"github.com/javiorfo/steams"
 )
 
@@ -28,7 +30,7 @@ type model struct {
 }
 
 func (m *model) totalAndPages() string {
-	return fmt.Sprintf(" %d movies - Page %d/%d ", m.total, m.page, m.totalPages)
+	return fmt.Sprintf(" %d movie/s - Page %d/%d ", m.total, m.page, m.totalPages)
 }
 
 func (m *model) updateTable(total int, movies []yts.Movie) {
@@ -54,7 +56,15 @@ type OnResponseMsg struct {
 func (m *model) request(page int) func() tea.Msg {
 	return func() tea.Msg {
 		m.filterText = m.textInput.Value()
-		total, movies := yts.GetMovies("https://en.yts-official.mx", m.filterText, "all", "all", "0", "0", "rating", page)
+
+		genre := getFilter(m.filterText, "genre:").OrElse("all")
+		rating := getFilter(m.filterText, "rating:").OrElse("0")
+		year := getFilter(m.filterText, "year:").OrElse("0")
+		order := getFilter(m.filterText, "order:").OrElse("rating")
+		filter := trimFilter(m.filterText, "genre:", "rating:", "year:", "order:")
+
+		total, movies := yts.GetMovies(Config.YTSHost, filter, genre, rating, year, order, page)
+
 		return OnResponseMsg{total: total, movies: movies}
 	}
 }
@@ -120,4 +130,24 @@ func moviesToRows(movies []yts.Movie) []table.Row {
 		return table.Row{m.Year, m.Name, torrent.Size, m.Genre, m.Rate, torrent.Duration, torrent.Resolution, torrent.Language}
 	}).Collect()
 	return rows
+}
+
+func getFilter(input, filter string) nilo.Optional[string] {
+	if strings.Contains(input, filter) {
+		text := input[strings.LastIndex(input, filter)+len(filter):]
+		if text != "" {
+			return nilo.Of(text)
+		}
+	}
+	return nilo.Empty[string]()
+}
+
+func trimFilter(input string, filters ...string) string {
+	text := input
+	for _, v := range filters {
+		if strings.Contains(text, v) {
+			text = text[:strings.LastIndex(input, v)]
+		}
+	}
+	return text
 }

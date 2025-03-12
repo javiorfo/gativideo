@@ -8,7 +8,10 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/javiorfo/bitsmuggler/config"
 )
+
+var Config = config.GetConfig()
 
 var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.ThickBorder()).
@@ -26,7 +29,7 @@ func InitialModel() model {
 		{Title: "NAME", Width: 50},
 		{Title: "SIZE", Width: 10},
 		{Title: "GENRE", Width: 35},
-		{Title: "RATE", Width: 4},
+		{Title: "RATING", Width: 7},
 		{Title: "DURATION", Width: 12},
 		{Title: "RESOLUTION", Width: 10},
 		{Title: "LANGUAGE", Width: 15},

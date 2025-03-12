@@ -7,7 +7,9 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/gocolly/colly/v2 v2.1.0
+	github.com/javiorfo/nilo v1.0.1
 	github.com/javiorfo/steams v1.4.0
+	github.com/pelletier/go-toml v1.9.5
 )
 
 require (
@@ -24,7 +26,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
-	github.com/javiorfo/nilo v1.0.1 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

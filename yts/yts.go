@@ -56,7 +56,7 @@ func torrentNotFound() Torrent {
 	}
 }
 
-func GetMovies(host, keyword, quality, genre, rating, year, order string, page int) (int, []Movie) {
+func GetMovies(host, keyword, genre, rating, year, order string, page int) (int, []Movie) {
 	c := colly.NewCollector()
 
 	var movies []Movie
@@ -108,6 +108,6 @@ func GetMovies(host, keyword, quality, genre, rating, year, order string, page i
 		}
 	})
 
-	c.Visit(fmt.Sprintf("%s/browse-movies?keyword=%s&quality=%s&genre=%s&rating=%s&year=%s&order_by=%s&page=%d", host, keyword, quality, genre, rating, year, order, page))
+	c.Visit(fmt.Sprintf("%s/browse-movies?keyword=%s&quality=all&genre=%s&rating=%s&year=%s&order_by=%s&page=%d", host, keyword, genre, rating, year, order, page))
 	return total, movies
 }
