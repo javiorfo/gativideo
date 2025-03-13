@@ -7,23 +7,29 @@ import (
 )
 
 const (
-	defaultYTSHost    = "https://en.yts-official.mx"
-	defaultYTSQuality = 1080
+	defaultYTSHost          = "https://en.yts-official.mx"
+	defaultYTSQuality       = 1080
+	defaultOpenSubsEnable   = false
+	defaultOpenSubsLanguage = "es"
 )
 
 type config struct {
-	YTSHost    string
-	YTSQuality int64
+	YTSHost          string
+	YTSQuality       int64
+	OpenSubsEnable   bool
+	OpenSubsLanguage string
 }
 
 func defaultConfig() config {
 	return config{
-		YTSHost:    defaultYTSHost,
-		YTSQuality: defaultYTSQuality,
+		YTSHost:          defaultYTSHost,
+		YTSQuality:       defaultYTSQuality,
+		OpenSubsEnable:   defaultOpenSubsEnable,
+		OpenSubsLanguage: defaultOpenSubsLanguage,
 	}
 }
 
-func GetConfig() config {
+func GetConfiguration() config {
 	home, _ := os.UserHomeDir()
 	tomlFile, err := toml.LoadFile(home + "/.config/bitsmuggler/config.toml")
 	if err != nil {
@@ -31,7 +37,9 @@ func GetConfig() config {
 	}
 
 	return config{
-		YTSHost:    tomlFile.GetDefault("yts.host", defaultYTSHost).(string),
-		YTSQuality: tomlFile.GetDefault("yts.quality", defaultYTSQuality).(int64),
+		YTSHost:          tomlFile.GetDefault("yts.host", defaultYTSHost).(string),
+		YTSQuality:       tomlFile.GetDefault("yts.quality", defaultYTSQuality).(int64),
+		OpenSubsEnable:   tomlFile.GetDefault("opensubs.enable", defaultOpenSubsEnable).(bool),
+		OpenSubsLanguage: tomlFile.GetDefault("opensubs.language", defaultOpenSubsLanguage).(string),
 	}
 }

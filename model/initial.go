@@ -11,7 +11,7 @@ import (
 	"github.com/javiorfo/bitsmuggler/config"
 )
 
-var Config = config.GetConfig()
+var Config = config.GetConfiguration()
 
 var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.ThickBorder()).

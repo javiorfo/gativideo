@@ -21,4 +21,13 @@ clean:
 	rm -rdf bin/
 	@echo "Done!"
 
+test:
+	@echo "Running tests..."
+	@go test -v ./yts/ ./opensubs/
+
+format:
+	@echo "Formatting..."
+	@gofmt -w .
+	@echo "Done!"
+
 .PHONY: all build install uninstall clean

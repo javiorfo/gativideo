@@ -7,10 +7,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/javiorfo/bitsmuggler/config"
+	"github.com/javiorfo/nilo"
+	"github.com/javiorfo/steams"
 )
+
+var configuration = config.GetConfiguration()
 
 type response struct {
 	Data [][]string `json:"data"`
@@ -23,24 +29,29 @@ type Subtitle struct {
 	Link      string
 }
 
-func (s Subtitle) GetDownloadSubCode() string {
+func (s Subtitle) GetDownloadSubCode() nilo.Optional[string] {
 	c := colly.NewCollector()
 
 	var subCode string
 	c.OnHTML("a", func(e *colly.HTMLElement) {
 		href := e.Attr("href")
-		if strings.Contains(href, "opensubtitles.org") && strings.Contains(href, "subtitles/") {
+		if strings.Contains(href, "opensubtitles.org/"+configuration.OpenSubsLanguage+"/subtitles") {
 			subCode = href[strings.LastIndex(href, "/")+1:]
 		}
 	})
 
 	c.Visit(s.Link)
-	return subCode
+
+	if subCode == "" {
+		return nilo.Empty[string]()
+	}
+	return nilo.Of(subCode)
 }
 
-func GetSubs(language, movieYear, movieName string) []Subtitle {
+func GetSubs(movieYear, movieName string) []Subtitle {
 	movieName = strings.ReplaceAll(strings.ToLower(movieName), " ", "-")
-	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", language, language, movieYear, movieName)
+
+	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
@@ -63,8 +74,8 @@ func GetSubs(language, movieYear, movieName string) []Subtitle {
 
 	var subtitles []Subtitle
 	for index := range response.Data {
+		var sub Subtitle
 		for i, v := range response.Data[index] {
-			var sub Subtitle
 			if i == 3 {
 				sub.Date = v
 			}
@@ -78,10 +89,16 @@ func GetSubs(language, movieYear, movieName string) []Subtitle {
 				download := v[strings.Index(v, "\">")+2:]
 				sub.Downloads = strings.TrimSuffix(download, "</a>")
 			}
-			subtitles = append(subtitles, sub)
 		}
+		subtitles = append(subtitles, sub)
 	}
-	return subtitles
+	return steams.OfSlice(subtitles).Sorted(sorted).Collect()
+}
+
+func sorted(s1 Subtitle, s2 Subtitle) bool {
+	a, _ := strconv.Atoi(s1.Downloads)
+	b, _ := strconv.Atoi(s2.Downloads)
+	return a > b
 }
 
 func DownloadZip(code, zipName string) {

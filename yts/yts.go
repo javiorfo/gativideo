@@ -10,7 +10,7 @@ import (
 	"github.com/javiorfo/steams"
 )
 
-var configuration = config.GetConfig()
+var configuration = config.GetConfiguration()
 
 type Movie struct {
 	Name     string
