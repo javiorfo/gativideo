@@ -38,7 +38,7 @@ func InitialModel() model {
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithFocused(true),
-		table.WithHeight(21),
+		table.WithHeight(10),
 		table.WithKeyMap(table.KeyMap{
 			LineUp: key.NewBinding(
 				key.WithKeys("up"),

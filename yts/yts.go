@@ -6,8 +6,11 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/javiorfo/bitsmuggler/config"
 	"github.com/javiorfo/steams"
 )
+
+var configuration = config.GetConfig()
 
 type Movie struct {
 	Name     string
@@ -17,7 +20,8 @@ type Movie struct {
 	Torrents []Torrent
 }
 
-func (m Movie) GetTorrent(quality string) Torrent {
+func (m Movie) GetTorrent() Torrent {
+	quality := strconv.Itoa(int(configuration.YTSQuality))
 	return steams.OfSlice(m.Torrents).FindOne(func(t Torrent) bool {
 		switch quality {
 		case "2160":
@@ -35,7 +39,7 @@ func (m Movie) GetTorrent(quality string) Torrent {
 				return true
 			}
 		}
-		return true
+		return false
 	}).OrElseGet(torrentNotFound)
 }
 
@@ -72,6 +76,9 @@ func GetMovies(host, keyword, genre, rating, year, order string, page int) (int,
 		language := 2
 		duration := 7
 		for i, v := range files {
+			if !strings.Contains(v, ".torrent") {
+				continue
+			}
 			torrents[i].File = v
 			sizeStr := strings.TrimSpace(torrentInfo[size])
 			if strings.Contains(sizeStr, "P/S") {

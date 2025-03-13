@@ -2,7 +2,7 @@
 host = "https://en.yts-official.mx"
 quality = 1080
 
-[osub]
+[opensubs]
 enable = true
 language = "es"
 

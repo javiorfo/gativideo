@@ -6,8 +6,10 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-const defaultYTSHost = "https://en.yts-official.mx"
-const defaultYTSQuality = 1080
+const (
+	defaultYTSHost    = "https://en.yts-official.mx"
+	defaultYTSQuality = 1080
+)
 
 type config struct {
 	YTSHost    string

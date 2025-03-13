@@ -36,7 +36,12 @@ func (m *model) totalAndPages() string {
 func (m *model) updateTable(total int, movies []yts.Movie) {
 	m.loading = false
 	m.movies = movies
-	rows := moviesToRows(movies)
+
+	rows := steams.Mapping(steams.OfSlice(movies), func(m yts.Movie) table.Row {
+		torrent := m.GetTorrent()
+		return table.Row{m.Year, m.Name, torrent.Size, m.Genre, m.Rate, torrent.Duration, torrent.Resolution, torrent.Language}
+	}).Collect()
+
 	m.filteredRows = rows
 	m.table.SetRows(m.filteredRows)
 	m.total = total
@@ -99,7 +104,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return slices.Compare(tr, m.table.SelectedRow()) == 0
 			}).OrElse(-1)
 			return m, tea.Batch(
-				tea.Printf("Movie %s", m.movies[index].GetTorrent("1080").File),
+				tea.Printf("Movie %s", m.movies[index].GetTorrent().File),
 			)
 		}
 	case spinner.TickMsg:
@@ -122,14 +127,6 @@ func (m model) View() string {
 		sp = m.spinner.View() + " searching movies\n"
 	}
 	return baseStyle.Render(m.textInput.View()) + "\n" + sp + baseStyle.Render(m.totalAndPages()) + "\n" + baseStyle.Render(m.table.View()) + "\n"
-}
-
-func moviesToRows(movies []yts.Movie) []table.Row {
-	rows := steams.Mapping(steams.OfSlice(movies), func(m yts.Movie) table.Row {
-		torrent := m.GetTorrent("1080")
-		return table.Row{m.Year, m.Name, torrent.Size, m.Genre, m.Rate, torrent.Duration, torrent.Resolution, torrent.Language}
-	}).Collect()
-	return rows
 }
 
 func getFilter(input, filter string) nilo.Optional[string] {
