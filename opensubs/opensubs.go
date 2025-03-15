@@ -1,12 +1,15 @@
 package opensubs
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -29,7 +32,7 @@ type Subtitle struct {
 	Link      string
 }
 
-func (s Subtitle) GetDownloadSubCode() nilo.Optional[string] {
+func (s Subtitle) GetDownloadSubtitleCode() nilo.Optional[string] {
 	c := colly.NewCollector()
 
 	var subCode string
@@ -49,7 +52,7 @@ func (s Subtitle) GetDownloadSubCode() nilo.Optional[string] {
 }
 
 func GetSubs(movieYear, movieName string) []Subtitle {
-	movieName = strings.ReplaceAll(strings.ToLower(movieName), " ", "-")
+	movieName = strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(movieName), " ", "-"), ":", "")
 
 	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
 	resp, err := http.Get(url)
@@ -101,21 +104,59 @@ func sorted(s1 Subtitle, s2 Subtitle) bool {
 	return a > b
 }
 
-func DownloadZip(code, zipName string) {
+func DownloadSubtitle(code, movieName string) {
 	resp, err := http.Get("https://dl.opensubtitles.org/en/download/sub/" + code)
 	if err != nil {
 		log.Fatalf("failed to send GET request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	out, err := os.Create(zipName)
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
-		log.Fatalf("failed to create file: %v", err)
+		log.Fatal("Error reading response body:", err)
+		return
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	zipReader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	if err != nil {
-		log.Fatalf("failed to copy content: %v", err)
+		log.Fatal("Error reading ZIP file:", err)
+		return
+	}
+
+	if err := os.MkdirAll(configuration.DownloadFolder, 0755); err != nil {
+		log.Fatal("Error creating extract directory:", err)
+		return
+	}
+
+	for _, file := range zipReader.File {
+		if file.FileInfo().IsDir() || !strings.Contains(file.Name, ".srt") {
+			continue
+		}
+
+		filePath := filepath.Join(configuration.DownloadFolder, movieName+".srt")
+		fileReader, err := file.Open()
+		if err != nil {
+			log.Fatal("Error opening file:", err)
+			return
+		}
+
+		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			log.Fatal("Error creating file:", err)
+			fileReader.Close()
+			return
+		}
+
+		_, err = io.Copy(outFile, fileReader)
+		if err != nil {
+			log.Fatal("Error copying file:", err)
+			fileReader.Close()
+			outFile.Close()
+			return
+		}
+
+		fileReader.Close()
+		outFile.Close()
 	}
 }

@@ -13,46 +13,46 @@ import (
 var configuration = config.GetConfiguration()
 
 type Movie struct {
-	Name     string
-	Year     string
-	Genre    string
-	Rate     string
-	Torrents []Torrent
+	Name      string
+	Year      string
+	Genre     string
+	Rate      string
+	TechSpecs []TechSpec
 }
 
-func (m Movie) GetTorrent() Torrent {
+func (m Movie) GetTechSpec() TechSpec {
 	quality := strconv.Itoa(int(configuration.YTSQuality))
-	return steams.OfSlice(m.Torrents).FindOne(func(t Torrent) bool {
+	return steams.OfSlice(m.TechSpecs).FindOne(func(t TechSpec) bool {
 		switch quality {
 		case "2160":
-			if strings.Contains(t.File, "2160") {
+			if strings.Contains(t.TorrentFileLink, "2160") {
 				return true
 			}
 			fallthrough
 		case "1080":
-			if strings.Contains(t.File, "1080") {
+			if strings.Contains(t.TorrentFileLink, "1080") {
 				return true
 			}
 			fallthrough
 		case "720":
-			if strings.Contains(t.File, "720") {
+			if strings.Contains(t.TorrentFileLink, "720") {
 				return true
 			}
 		}
 		return false
-	}).OrElseGet(torrentNotFound)
+	}).OrElseGet(techSpecNotFound)
 }
 
-type Torrent struct {
-	File       string
-	Size       string
-	Resolution string
-	Duration   string
-	Language   string
+type TechSpec struct {
+	TorrentFileLink string
+	Size            string
+	Resolution      string
+	Duration        string
+	Language        string
 }
 
-func torrentNotFound() Torrent {
-	return Torrent{
+func techSpecNotFound() TechSpec {
+	return TechSpec{
 		Size:       "Unknown",
 		Resolution: "Unknown",
 		Duration:   "Unknown",
@@ -66,30 +66,30 @@ func GetMovies(host, keyword, genre, rating, year, order string, page int) (int,
 	var movies []Movie
 	c.OnHTML("div#movie-content", func(e *colly.HTMLElement) {
 		data := strings.Split(e.ChildText("div div#movie-info div"), "\n")
-		files := e.ChildAttrs("div div#movie-info div p a", "href")
+		tFiles := e.ChildAttrs("div div#movie-info div p a", "href")
 
-		torrentInfo := strings.Split(e.ChildText("div#movie-tech-specs div.tech-spec-info div div"), "\n")
+		techSpecInfo := strings.Split(e.ChildText("div#movie-tech-specs div.tech-spec-info div div"), "\n")
 
-		torrents := make([]Torrent, len(files))
+		techSpecs := make([]TechSpec, len(tFiles))
 		size := 0
 		resolution := 1
 		language := 2
 		duration := 7
-		for i, v := range files {
-			if !strings.Contains(v, ".torrent") {
+		for i, t := range tFiles {
+			if !strings.Contains(t, ".torrent") {
 				continue
 			}
-			torrents[i].File = v
-			sizeStr := strings.TrimSpace(torrentInfo[size])
+			techSpecs[i].TorrentFileLink = configuration.YTSHost + t
+			sizeStr := strings.TrimSpace(techSpecInfo[size])
 			if strings.Contains(sizeStr, "P/S") {
 				i := strings.LastIndex(sizeStr[:len(sizeStr)-3], " ")
 				sizeStr = sizeStr[i+1:]
 			}
 
-			torrents[i].Size = sizeStr
-			torrents[i].Resolution = strings.TrimSpace(torrentInfo[resolution])
-			torrents[i].Language = strings.TrimSpace(torrentInfo[language])
-			torrents[i].Duration = strings.TrimSpace(torrentInfo[duration])
+			techSpecs[i].Size = sizeStr
+			techSpecs[i].Resolution = strings.TrimSpace(techSpecInfo[resolution])
+			techSpecs[i].Language = strings.TrimSpace(techSpecInfo[language])
+			techSpecs[i].Duration = strings.TrimSpace(techSpecInfo[duration])
 			size += 8
 			resolution += 8
 			language += 8
@@ -97,11 +97,11 @@ func GetMovies(host, keyword, genre, rating, year, order string, page int) (int,
 		}
 
 		movie := Movie{
-			Name:     strings.TrimSpace(data[0]),
-			Year:     strings.TrimSpace(data[1]),
-			Genre:    strings.TrimSpace(data[2]),
-			Rate:     strings.TrimSpace(data[len(data)-1]),
-			Torrents: torrents,
+			Name:      strings.TrimSpace(data[0]),
+			Year:      strings.TrimSpace(data[1]),
+			Genre:     strings.TrimSpace(data[2]),
+			Rate:      strings.TrimSpace(data[len(data)-1]),
+			TechSpecs: techSpecs,
 		}
 		movies = append(movies, movie)
 	})

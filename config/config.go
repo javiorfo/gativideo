@@ -18,6 +18,7 @@ type config struct {
 	YTSQuality       int64
 	OpenSubsEnable   bool
 	OpenSubsLanguage string
+	DownloadFolder   string
 }
 
 func defaultConfig() config {
@@ -41,5 +42,6 @@ func GetConfiguration() config {
 		YTSQuality:       tomlFile.GetDefault("yts.quality", defaultYTSQuality).(int64),
 		OpenSubsEnable:   tomlFile.GetDefault("opensubs.enable", defaultOpenSubsEnable).(bool),
 		OpenSubsLanguage: tomlFile.GetDefault("opensubs.language", defaultOpenSubsLanguage).(string),
+		DownloadFolder:   tomlFile.GetDefault("general.download_folder", "").(string),
 	}
 }

@@ -6,7 +6,8 @@ quality = 1080
 enable = true
 language = "es"
 
-[colors]
+[general]
+download_folder = "/path/to/movies"
 table = 250
 input = 250
 spinner = 250
