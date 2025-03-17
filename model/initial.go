@@ -1,6 +1,7 @@
 package model
 
 import (
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -12,10 +13,13 @@ import (
 )
 
 var configuration = config.GetConfiguration()
+var once sync.Once
 
 var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.ThickBorder()).
-	BorderForeground(lipgloss.Color("240"))
+	BorderForeground(lipgloss.Color("240")).Render
+
+var downloadStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Bold(true).Render
 
 func InitialModel() model {
 	ti := textinput.New()
@@ -37,7 +41,7 @@ func InitialModel() model {
 	tMovies := table.New(table.WithColumns(columnsMovies), table.WithFocused(true), table.WithHeight(10), tableKeymaps())
 
 	columnsSubs := []table.Column{
-		{Title: "NAME", Width: 70},
+		{Title: "NAME", Width: 100},
 		{Title: "DATE", Width: 10},
 		{Title: "DOWNLOADS", Width: 10},
 	}
@@ -63,12 +67,13 @@ func InitialModel() model {
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 
 	return model{
-		tableMovies: tMovies,
-		tableSubs:   tSubs,
-		textInput:   ti,
-		spinner:     sp,
-		loading:     true,
-		page:        1,
+		tableMovies:    tMovies,
+		tableSubs:      tSubs,
+		textInput:      ti,
+		spinner:        sp,
+		loading:        true,
+		page:           1,
+		cancelDownload: make(chan struct{}),
 	}
 }
 

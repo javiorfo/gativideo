@@ -18,19 +18,22 @@ import (
 )
 
 type model struct {
-	tableMovies  table.Model
-	filteredRows []table.Row
-	movies       []yts.Movie
-	total        int
-	page         int
-	totalPages   int
-	tableSubs    table.Model
-	subtitles    []opensubs.Subtitle
-	showSubs     bool
-	textInput    textinput.Model
-	filterText   string
-	spinner      spinner.Model
-	loading      bool
+	tableMovies       table.Model
+	filteredRows      []table.Row
+	movies            []yts.Movie
+	total             int
+	page              int
+	totalPages        int
+	tableSubs         table.Model
+	subtitles         []opensubs.Subtitle
+	showSubs          bool
+	textInput         textinput.Model
+	filterText        string
+	spinner           spinner.Model
+	loading           bool
+	downloader        *torr.Downloader
+	movieDownloadInfo string
+	cancelDownload    chan struct{}
 }
 
 func (m *model) totalAndPages() string {
@@ -117,8 +120,14 @@ func (m *model) getSubtitleCode() nilo.Optional[string] {
 	return m.subtitles[index.Get()].GetDownloadSubtitleCode()
 }
 
+func (m *model) download() tea.Msg {
+	m.downloader = torr.NewDownloader()
+	m.downloader.Scan(m.cancelDownload)
+	return nil
+}
+
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.request(1))
+	return tea.Batch(m.spinner.Tick, m.request(1), m.download)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -126,8 +135,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+d":
+			if m.downloader != nil && m.downloader.Downloading {
+				once.Do(func() { close(m.cancelDownload) })
+			}
+			return m, cmd
 		case "ctrl+n":
 			if m.page < m.totalPages {
 				m.loading = true
@@ -154,6 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.page = 1
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
 		case "ctrl+s":
+			// TODO validate empty
 			year := m.tableMovies.SelectedRow()[0]
 			name := m.tableMovies.SelectedRow()[1]
 			m.updateTableSubs(year, name)
@@ -165,10 +180,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				subCode := m.getSubtitleCode().Get()
 				movieTorrentName, _ := torr.MovieTorrentName(m.getTorrentFileLink().Get())
 				opensubs.DownloadSubtitle(subCode, movieTorrentName)
-				return m, tea.Batch(tea.Printf("Subs %s %s", subCode, movieTorrentName))
+				print := downloadStyle(fmt.Sprintf("  %s.srt Downloaded!", movieTorrentName))
+				return m, tea.Batch(tea.Println(print))
 			}
-			torr.DownloadTorrentFile(tFile)
-			return m, tea.Batch(tea.Printf("Movie %s", tFile))
+
+			if m.downloader == nil || !m.downloader.Downloading {
+				m.downloader = torr.NewDownloader()
+				m.downloader.DownloadTorrentFile(tFile)
+				m.downloader.Scan(m.cancelDownload)
+			}
+
+			return m, cmd
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -176,6 +198,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case onYTSResponseMsg:
 		m.updateTable(msg.total, msg.movies)
+		return m, cmd
+	case torr.OnDownloadStatus:
+		m.movieDownloadInfo = string(msg)
 		return m, cmd
 	}
 
@@ -186,6 +211,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	if torr.Status != "" {
+		m.movieDownloadInfo = downloadStyle(string(torr.Status)) + "\n"
+	}
+
 	var sp string
 	if m.loading {
 		sp = m.spinner.View() + " searching movies\n"
@@ -193,12 +222,12 @@ func (m model) View() string {
 
 	var tableToShow string
 	if m.showSubs {
-		tableToShow = baseStyle.Render(m.tableSubs.View()) + "\n"
+		tableToShow = baseStyle(m.tableSubs.View()) + "\n"
 	} else {
-		tableToShow = baseStyle.Render(m.tableMovies.View()) + "\n"
+		tableToShow = baseStyle(m.tableMovies.View()) + "\n"
 	}
 
-	return baseStyle.Render(m.textInput.View()) + "\n" + sp + baseStyle.Render(m.totalAndPages()) + "\n" + tableToShow
+	return m.movieDownloadInfo + baseStyle(m.textInput.View()) + "\n" + sp + baseStyle(m.totalAndPages()) + "\n" + tableToShow
 }
 
 func filter(input, filter string) nilo.Optional[string] {

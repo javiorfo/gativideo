@@ -99,6 +99,9 @@ func GetSubs(movieYear, movieName string) []Subtitle {
 }
 
 func sorted(s1 Subtitle, s2 Subtitle) bool {
+	if strings.Contains(strings.ToLower(s1.Name), "yify") {
+		return true
+	}
 	a, _ := strconv.Atoi(s1.Downloads)
 	b, _ := strconv.Atoi(s2.Downloads)
 	return a > b

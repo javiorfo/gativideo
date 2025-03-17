@@ -8,15 +8,136 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	torrLog "github.com/anacrolix/log"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/javiorfo/bitsmuggler/config"
+	"github.com/javiorfo/nilo"
 )
 
 var configuration = config.GetConfiguration()
+
+type OnDownloadStatus string
+
+var Status OnDownloadStatus
+
+var once sync.Once
+
+type Downloader struct {
+	torrentPath     string
+	torrentName     string
+	movieTorrentDir string
+	Downloading     bool
+}
+
+func NewDownloader() *Downloader {
+	return &Downloader{}
+}
+
+func (d *Downloader) Scan(cancelDownload <-chan struct{}) {
+	searchTorrent().IfPresent(func(torrentPath string) {
+		d.Downloading = true
+		d.torrentPath = torrentPath
+		go d.downloadMovie(cancelDownload)
+	})
+}
+
+func (d *Downloader) DownloadTorrentFile(tFile string) {
+	resp, err := http.Get(tFile)
+	if err != nil {
+		log.Fatalf("failed to get torrent file from %s: %v", tFile, err)
+	}
+	defer resp.Body.Close()
+
+	d.torrentPath = filepath.Join(configuration.DownloadFolder, filepath.Base(tFile))
+	out, err := os.Create(d.torrentPath)
+	if err != nil {
+		log.Fatalf("failed to create file: %v", err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		log.Fatalf("failed to copy content: %v", err)
+	}
+}
+
+func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
+	clientConfig := torrent.NewDefaultClientConfig()
+	clientConfig.DataDir = configuration.DownloadFolder
+	clientConfig.Logger.SetHandlers(torrLog.DiscardHandler)
+
+	c, _ := torrent.NewClient(clientConfig)
+	defer c.Close()
+
+	t, _ := c.AddTorrentFromFile(d.torrentPath)
+
+	<-t.GotInfo()
+	t.DownloadAll()
+	d.torrentName = t.Name()
+	for !t.Seeding() {
+		select {
+		case <-cancelDownload:
+			Status = OnDownloadStatus(fmt.Sprintf("  %s Canceled!", t.Name()))
+			_ = os.Remove(d.torrentPath)
+			_ = os.RemoveAll(filepath.Join(configuration.DownloadFolder, d.torrentName))
+			return
+		default:
+			stats := t.Stats()
+			totalSize := t.Info().TotalLength()
+			s := t.BytesCompleted()
+			Status = OnDownloadStatus(fmt.Sprintf("  %s | Progress %.2f%% | Peers %d/%d", t.Name(), (float64(s)/float64(totalSize))*100.0, stats.ActivePeers, stats.TotalPeers))
+			if t.BytesCompleted() == totalSize {
+				Status = OnDownloadStatus(fmt.Sprintf("  %s Completed!", t.Name()))
+				d.purge()
+				return
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	c.WaitAll()
+}
+
+func (d *Downloader) purge() {
+	_ = os.Remove(d.torrentPath)
+	d.movieTorrentDir = filepath.Join(configuration.DownloadFolder, d.torrentName)
+	subtitlePath := d.movieTorrentDir + ".srt"
+	subtitleDestPath := filepath.Join(d.movieTorrentDir, d.torrentName+".srt")
+
+	if _, err := os.Stat(subtitlePath); err != nil {
+		return
+	}
+
+	err := os.Rename(subtitlePath, subtitleDestPath)
+	if err != nil {
+		log.Fatal("Error moving the file:", err)
+		return
+	}
+
+	files, err := os.ReadDir(d.movieTorrentDir)
+	if err != nil {
+		log.Fatal("Error reading directory:", err)
+		return
+	}
+
+	for _, file := range files {
+		if !file.IsDir() {
+			fileName := file.Name()
+			filePath := filepath.Join(d.movieTorrentDir, fileName)
+			if strings.HasSuffix(fileName, ".mp4") {
+				_ = os.Rename(filePath, filepath.Join(d.movieTorrentDir, d.torrentName+".mp4"))
+			} else {
+				filePath := filepath.Join(d.movieTorrentDir, fileName)
+				_ = os.Remove(filePath)
+			}
+		}
+	}
+
+}
 
 func MovieTorrentName(torrentPath string) (string, error) {
 	resp, err := http.Get(torrentPath)
@@ -43,61 +164,20 @@ func MovieTorrentName(torrentPath string) (string, error) {
 	return info.Name, nil
 }
 
-func DownloadTorrentFile(tFile string) {
-	resp, err := http.Get(tFile)
-	if err != nil {
-		log.Fatalf("failed to get torrent file from %s: %v", tFile, err)
-	}
-	defer resp.Body.Close()
-
-	destFile := filepath.Join(configuration.DownloadFolder, filepath.Base(tFile))
-	out, err := os.Create(destFile)
-	if err != nil {
-		log.Fatalf("failed to create file: %v", err)
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		log.Fatalf("failed to copy content: %v", err)
-	}
-}
-
-type OnDownloadMsg string
-
-var Update OnDownloadMsg
-
-func DownloadMovies() {
-	clientConfig := torrent.NewDefaultClientConfig()
-	clientConfig.DataDir = configuration.DownloadFolder
-	clientConfig.Logger.SetHandlers(torrLog.DiscardHandler)
-
-	c, _ := torrent.NewClient(clientConfig)
-	defer c.Close()
-
-	// TODO search .torrent
-	t, _ := c.AddTorrentFromFile(filepath.Join(configuration.DownloadFolder, "eric.torrent"))
-	<-t.GotInfo()
-	t.DownloadAll()
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for !t.Seeding() {
-		select {
-		case <-ticker.C:
-			// 			stats := t.Stats()
-			totalSize := t.Info().TotalLength()
-			s := t.BytesCompleted()
-			// 			fmt.Printf("Mp4: %d \n", s)
-			Update = OnDownloadMsg(fmt.Sprintf("Mp4: %d \n", s))
-			/* 			fmt.Printf("Peers: %d/%d\n", stats.ActivePeers, stats.TotalPeers)
-			   			fmt.Printf("Total: %d \n", totalSize)
-			   			fmt.Printf("Downloaded: %.2f%%\n", (float64(s)/float64(totalSize))*100) */
-			if t.BytesCompleted() == totalSize {
-				// 				log.Print("Torrent downloaded")
-				return
-			}
+func searchTorrent() nilo.Optional[string] {
+	var optional nilo.Optional[string]
+	err := filepath.Walk(configuration.DownloadFolder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
+		if !info.IsDir() && filepath.Ext(info.Name()) == ".torrent" {
+			optional = nilo.Of(path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nilo.Empty[string]()
 	}
+	return optional
 }
