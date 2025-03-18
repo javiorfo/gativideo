@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	defaultYTSHost               = "https://en.yts-official.mx"
-	defaultYTSQuality            = 1080
-	defaultYTSOrderBy            = "rating"
-	defaultOpenSubsLanguage      = "es"
-	defaultTableBorderColor      = "240"
-	defaultTableSelectionFgColor = "15"
-	defaultTableSelectionBgColor = "240"
-	defaultSpinnerColor          = "15"
-	defaultDownloadColor         = "250"
+	defaultYTSHost                     = "https://en.yts-official.mx"
+	defaultYTSQuality            int64 = 1080
+	defaultYTSOrderBy                  = "rating"
+	defaultOpenSubsLanguage            = "es"
+	defaultTableBorderColor            = "240"
+	defaultTableSelectionFgColor       = "15"
+	defaultTableSelectionBgColor       = "240"
+	defaultSpinnerColor                = "15"
+	defaultDownloadColor               = "250"
 )
 
 type config struct {
