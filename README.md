@@ -45,13 +45,18 @@ yay -S bitsmuggler
 - Use `Ctrl+c` to exit **bitsmuggler**
 
 ## Extra
-- The subtitle search is disabled by default. In case is needed, enable it using the **config.toml** [parameter](https://github.com/javiorfo/bitsmuggler/blob/master/example/config.toml).
+- The subtitle search is disabled by default. In case is needed, enable it and set the language using the **config.toml** [parameter](https://github.com/javiorfo/bitsmuggler/blob/master/example/config.toml).
 - The subtitle search is bound to the movie. Nonetheless, you can download only the subtitles.
 - Only one movie at the time could be downloaded. You can close **bitsmuggler** and when you open it again It will resume the incomplete download and finish it unless it is canceled by the user.
 - The quality selected by default is **1080** but could be modified in the config.toml file. Using 2160, 1080 or 720 (A fallback is used from mayor to minor. Ex: If 2160 is set and not found, it will search 1080 and so on).
     
 ## Demos and screenshots
 
+<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler-simple.gif?raw=true" alt="bitsmuggler"/>
+
+#### Using filters
+- **order** filter could be: *latest, oldest, rating, alphabetical, featured, year or likes*
+<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler-filters.gif?raw=true" alt="bitsmuggler"/>
 ---
 
 ### Donate
