@@ -3,10 +3,15 @@
 
 ## Caveats
 - Go version **1.24**
-- This library has been developed on and for Linux following open source philosophy.
+- This program has been developed on and for Linux following open source philosophy.
 
 ## Installation
-- Downloading, compiling and installing manually:
+- Using Go
+```bash
+go install github.com/javiorfo/bitsmuggler@latest
+```
+
+- Downloading, compiling and installing manually (Linux):
 ```bash
 git clone https://github.com/javiorfo/bitsmuggler
 cd bitsmuggler

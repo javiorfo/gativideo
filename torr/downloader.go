@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	torrLog "github.com/anacrolix/log"
@@ -21,21 +19,14 @@ import (
 
 var configuration = config.GetConfiguration()
 
-type OnDownloadStatus string
+type OnDownload string
 
-var Status OnDownloadStatus
-
-var once sync.Once
+var Status OnDownload
 
 type Downloader struct {
-	torrentPath     string
-	torrentName     string
-	movieTorrentDir string
-	Downloading     bool
-}
-
-func NewDownloader() *Downloader {
-	return &Downloader{}
+	torrentPath string
+	torrentName string
+	Downloading bool
 }
 
 func (d *Downloader) Scan(cancelDownload <-chan struct{}) {
@@ -46,24 +37,25 @@ func (d *Downloader) Scan(cancelDownload <-chan struct{}) {
 	})
 }
 
-func (d *Downloader) DownloadTorrentFile(tFile string) {
+func (d *Downloader) DownloadTorrentFile(tFile string) error {
 	resp, err := http.Get(tFile)
 	if err != nil {
-		log.Fatalf("failed to get torrent file from %s: %v", tFile, err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	d.torrentPath = filepath.Join(configuration.DownloadFolder, filepath.Base(tFile))
 	out, err := os.Create(d.torrentPath)
 	if err != nil {
-		log.Fatalf("failed to create file: %v", err)
+		return err
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		log.Fatalf("failed to copy content: %v", err)
+		return err
 	}
+	return nil
 }
 
 func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
@@ -82,18 +74,18 @@ func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
 	for !t.Seeding() {
 		select {
 		case <-cancelDownload:
-			Status = OnDownloadStatus(fmt.Sprintf("  %s Canceled!", t.Name()))
+			Status = OnDownload(fmt.Sprintf("  %s Canceled!", t.Name()))
 			_ = os.Remove(d.torrentPath)
 			_ = os.RemoveAll(filepath.Join(configuration.DownloadFolder, d.torrentName))
 			return
 		default:
 			stats := t.Stats()
 			totalSize := t.Info().TotalLength()
-			s := t.BytesCompleted()
-			Status = OnDownloadStatus(fmt.Sprintf("  %s | Progress %.2f%% | Peers %d/%d", t.Name(), (float64(s)/float64(totalSize))*100.0, stats.ActivePeers, stats.TotalPeers))
-			if t.BytesCompleted() == totalSize {
-				Status = OnDownloadStatus(fmt.Sprintf("  %s Completed!", t.Name()))
-				d.purge()
+			completed := t.BytesCompleted()
+			Status = OnDownload(fmt.Sprintf("  %s | Progress %.2f%% | Peers %d/%d", d.torrentName, (float64(completed)/float64(totalSize))*100.0, stats.ActivePeers, stats.TotalPeers))
+			if completed == totalSize {
+				Status = OnDownload(fmt.Sprintf("  %s Completed!", d.torrentName))
+				_ = d.purge()
 				return
 			}
 		}
@@ -102,41 +94,39 @@ func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
 	c.WaitAll()
 }
 
-func (d *Downloader) purge() {
+func (d *Downloader) purge() error {
 	_ = os.Remove(d.torrentPath)
-	d.movieTorrentDir = filepath.Join(configuration.DownloadFolder, d.torrentName)
-	subtitlePath := d.movieTorrentDir + ".srt"
-	subtitleDestPath := filepath.Join(d.movieTorrentDir, d.torrentName+".srt")
+	movieTorrentDir := filepath.Join(configuration.DownloadFolder, d.torrentName)
+	subtitlePath := movieTorrentDir + ".srt"
+	subtitleDestPath := filepath.Join(movieTorrentDir, d.torrentName+".srt")
 
 	if _, err := os.Stat(subtitlePath); err != nil {
-		return
+		return err
 	}
 
 	err := os.Rename(subtitlePath, subtitleDestPath)
 	if err != nil {
-		log.Fatal("Error moving the file:", err)
-		return
+		return err
 	}
 
-	files, err := os.ReadDir(d.movieTorrentDir)
+	files, err := os.ReadDir(movieTorrentDir)
 	if err != nil {
-		log.Fatal("Error reading directory:", err)
-		return
+		return err
 	}
 
 	for _, file := range files {
 		if !file.IsDir() {
 			fileName := file.Name()
-			filePath := filepath.Join(d.movieTorrentDir, fileName)
+			filePath := filepath.Join(movieTorrentDir, fileName)
 			if strings.HasSuffix(fileName, ".mp4") {
-				_ = os.Rename(filePath, filepath.Join(d.movieTorrentDir, d.torrentName+".mp4"))
+				_ = os.Rename(filePath, filepath.Join(movieTorrentDir, d.torrentName+".mp4"))
 			} else {
-				filePath := filepath.Join(d.movieTorrentDir, fileName)
+				filePath := filepath.Join(movieTorrentDir, fileName)
 				_ = os.Remove(filePath)
 			}
 		}
 	}
-
+	return nil
 }
 
 func MovieTorrentName(torrentPath string) (string, error) {

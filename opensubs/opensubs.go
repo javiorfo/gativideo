@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/javiorfo/bitsmuggler/config"
-	"github.com/javiorfo/nilo"
 	"github.com/javiorfo/steams"
 )
 
@@ -32,7 +30,7 @@ type Subtitle struct {
 	Link      string
 }
 
-func (s Subtitle) GetDownloadSubtitleCode() nilo.Optional[string] {
+func (s Subtitle) GetDownloadSubtitleCode() string {
 	c := colly.NewCollector()
 
 	var subCode string
@@ -45,34 +43,28 @@ func (s Subtitle) GetDownloadSubtitleCode() nilo.Optional[string] {
 
 	c.Visit(s.Link)
 
-	if subCode == "" {
-		return nilo.Empty[string]()
-	}
-	return nilo.Of(subCode)
+	return subCode
 }
 
-func GetSubs(movieYear, movieName string) []Subtitle {
+func GetSubs(movieYear, movieName string) ([]Subtitle, error) {
 	movieName = strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(movieName), " ", "-"), ":", "")
 
 	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatal(err)
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
-		return nil
+		return nil, err
 	}
 
 	var response response
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		log.Fatal(err)
-		return nil
+		return nil, err
 	}
 
 	var subtitles []Subtitle
@@ -95,7 +87,7 @@ func GetSubs(movieYear, movieName string) []Subtitle {
 		}
 		subtitles = append(subtitles, sub)
 	}
-	return steams.OfSlice(subtitles).Sorted(sorted).Collect()
+	return steams.OfSlice(subtitles).Sorted(sorted).Collect(), nil
 }
 
 func sorted(s1 Subtitle, s2 Subtitle) bool {
@@ -107,29 +99,26 @@ func sorted(s1 Subtitle, s2 Subtitle) bool {
 	return a > b
 }
 
-func DownloadSubtitle(code, movieName string) {
+func DownloadSubtitle(code, movieName string) error {
 	resp, err := http.Get("https://dl.opensubtitles.org/en/download/sub/" + code)
 	if err != nil {
-		log.Fatalf("failed to send GET request: %v", err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
-		log.Fatal("Error reading response body:", err)
-		return
+		return err
 	}
 
 	zipReader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	if err != nil {
-		log.Fatal("Error reading ZIP file:", err)
-		return
+		return err
 	}
 
 	if err := os.MkdirAll(configuration.DownloadFolder, 0755); err != nil {
-		log.Fatal("Error creating extract directory:", err)
-		return
+		return err
 	}
 
 	for _, file := range zipReader.File {
@@ -140,26 +129,24 @@ func DownloadSubtitle(code, movieName string) {
 		filePath := filepath.Join(configuration.DownloadFolder, movieName+".srt")
 		fileReader, err := file.Open()
 		if err != nil {
-			log.Fatal("Error opening file:", err)
-			return
+			return err
 		}
 
 		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
-			log.Fatal("Error creating file:", err)
 			fileReader.Close()
-			return
+			return err
 		}
 
 		_, err = io.Copy(outFile, fileReader)
 		if err != nil {
-			log.Fatal("Error copying file:", err)
 			fileReader.Close()
 			outFile.Close()
-			return
+			return err
 		}
 
 		fileReader.Close()
 		outFile.Close()
 	}
+	return nil
 }

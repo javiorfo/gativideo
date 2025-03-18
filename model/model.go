@@ -60,15 +60,21 @@ func (m *model) updateTable(total int, movies []yts.Movie) {
 	}
 }
 
-func (m *model) updateTableSubs(year, movie string) {
+func (m *model) updateTableSubs(year, movie string) error {
 	m.toggleTables()
 
-	m.subtitles = opensubs.GetSubs(year, movie)
+	subs, err := opensubs.GetSubs(year, movie)
+	if err != nil {
+		return err
+	}
+
+	m.subtitles = subs
 	rows := steams.Mapping(steams.OfSlice(m.subtitles), func(s opensubs.Subtitle) table.Row {
 		return table.Row{s.Name, s.Date, s.Downloads}
 	}).Collect()
 
 	m.tableSubs.SetRows(rows)
+	return nil
 }
 
 func (m *model) toggleTables() {
@@ -79,9 +85,11 @@ func (m *model) toggleTables() {
 		return
 	}
 
-	m.showSubs = true
-	m.tableMovies.Blur()
-	m.tableSubs.Focus()
+	if configuration.OpenSubsEnable {
+		m.showSubs = true
+		m.tableMovies.Blur()
+		m.tableSubs.Focus()
+	}
 }
 
 type onYTSResponseMsg struct {
@@ -96,7 +104,7 @@ func (m *model) request(page int) func() tea.Msg {
 		genre := filter(m.filterText, "genre:").OrElse("all")
 		rating := filter(m.filterText, "rating:").OrElse("0")
 		year := filter(m.filterText, "year:").OrElse("0")
-		order := filter(m.filterText, "order:").OrElse("latest")
+		order := filter(m.filterText, "order:").OrElse(configuration.YTSOrderBy)
 		filter := trimFilter(m.filterText, "genre:", "rating:", "year:", "order:")
 
 		total, movies := yts.GetMovies(configuration.YTSHost, filter, genre, rating, year, order, page)
@@ -114,14 +122,15 @@ func (m *model) getTorrentFileLink() nilo.Optional[string] {
 }
 
 func (m *model) getSubtitleCode() nilo.Optional[string] {
-	index := steams.OfSlice(m.tableSubs.Rows()).Position(func(tr table.Row) bool {
+	return steams.OfSlice(m.tableSubs.Rows()).Position(func(tr table.Row) bool {
 		return slices.Compare(tr, m.tableSubs.SelectedRow()) == 0
+	}).MapToString(func(i int) string {
+		return m.subtitles[i].GetDownloadSubtitleCode()
 	})
-	return m.subtitles[index.Get()].GetDownloadSubtitleCode()
 }
 
 func (m *model) download() tea.Msg {
-	m.downloader = torr.NewDownloader()
+	m.downloader = &torr.Downloader{}
 	m.downloader.Scan(m.cancelDownload)
 	return nil
 }
@@ -141,52 +150,76 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.downloader != nil && m.downloader.Downloading {
 				once.Do(func() { close(m.cancelDownload) })
 			}
+
 			return m, cmd
 		case "ctrl+n":
 			if m.page < m.totalPages {
 				m.loading = true
 				m.page += 1
 			}
+
 			if m.showSubs {
 				m.toggleTables()
 			}
+
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
 		case "ctrl+b":
 			if m.page > 1 {
 				m.loading = true
 				m.page -= 1
 			}
+
 			if m.showSubs {
 				m.toggleTables()
 			}
+
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
 		case "enter":
 			m.loading = true
+
 			if m.showSubs {
 				m.toggleTables()
 			}
+
 			m.page = 1
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
 		case "ctrl+s":
-			// TODO validate empty
 			year := m.tableMovies.SelectedRow()[0]
 			name := m.tableMovies.SelectedRow()[1]
-			m.updateTableSubs(year, name)
-			return m, cmd
-		case "ctrl+a":
-			// TODO manage errors
-			tFile := m.getTorrentFileLink().Get()
-			if m.showSubs {
-				subCode := m.getSubtitleCode().Get()
-				movieTorrentName, _ := torr.MovieTorrentName(m.getTorrentFileLink().Get())
-				opensubs.DownloadSubtitle(subCode, movieTorrentName)
-				print := downloadStyle(fmt.Sprintf("  %s.srt Downloaded!", movieTorrentName))
-				return m, tea.Batch(tea.Println(print))
+			err := m.updateTableSubs(year, name)
+
+			if err != nil {
+				return m, tea.Batch(tea.Println(errorStyle(fmt.Sprintf("  %s", err.Error()))))
 			}
 
-			if m.downloader == nil || !m.downloader.Downloading {
-				m.downloader = torr.NewDownloader()
-				m.downloader.DownloadTorrentFile(tFile)
+			return m, cmd
+		case "ctrl+a":
+			tFile := m.getTorrentFileLink()
+			if m.showSubs && tFile.IsPresent() {
+				subCode := m.getSubtitleCode()
+				movieTorrentName, err := torr.MovieTorrentName(tFile.Get())
+
+				if err != nil {
+					return m, tea.Batch(tea.Println(errorStyle(fmt.Sprintf("  %s", err.Error()))))
+				}
+
+				if subCode.IsPresent() {
+					err := opensubs.DownloadSubtitle(subCode.Get(), movieTorrentName)
+					print := downloadStyle(fmt.Sprintf("  %s.srt Downloaded!", movieTorrentName))
+					if err != nil {
+						print = errorStyle(fmt.Sprintf("  %s", err.Error()))
+					}
+					return m, tea.Batch(tea.Println(print))
+				}
+				return m, tea.Batch(tea.Println(errorStyle("  Subtitle could not be downloaded")))
+			}
+
+			if tFile.IsPresent() && (m.downloader == nil || !m.downloader.Downloading) {
+				m.downloader = &torr.Downloader{}
+				err := m.downloader.DownloadTorrentFile(tFile.Get())
+				if err != nil {
+					return m, tea.Batch(tea.Println(errorStyle(fmt.Sprintf("  %s", err.Error()))))
+				}
 				m.downloader.Scan(m.cancelDownload)
 			}
 
@@ -199,7 +232,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case onYTSResponseMsg:
 		m.updateTable(msg.total, msg.movies)
 		return m, cmd
-	case torr.OnDownloadStatus:
+	case torr.OnDownload:
 		m.movieDownloadInfo = string(msg)
 		return m, cmd
 	}

@@ -17,9 +17,10 @@ var once sync.Once
 
 var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.ThickBorder()).
-	BorderForeground(lipgloss.Color("240")).Render
+	BorderForeground(lipgloss.Color(configuration.TableBorderColor)).Render
 
-var downloadStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Bold(true).Render
+var downloadStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(configuration.DownloadColor)).Render
+var errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Bold(true).Render
 
 func InitialModel() model {
 	ti := textinput.New()
@@ -38,7 +39,7 @@ func InitialModel() model {
 		{Title: "RESOLUTION", Width: 10},
 		{Title: "LANGUAGE", Width: 15},
 	}
-	tMovies := table.New(table.WithColumns(columnsMovies), table.WithFocused(true), table.WithHeight(10), tableKeymaps())
+	tMovies := table.New(table.WithColumns(columnsMovies), table.WithFocused(true), table.WithHeight(21), tableKeymaps())
 
 	columnsSubs := []table.Column{
 		{Title: "NAME", Width: 100},
@@ -50,12 +51,12 @@ func InitialModel() model {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color(configuration.TableBorderColor)).
 		BorderBottom(true).
 		Bold(true)
 	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("15")).
-		Background(lipgloss.Color("240")).
+		Foreground(lipgloss.Color(configuration.TableSelectionFgColor)).
+		Background(lipgloss.Color(configuration.TableSelectionBgColor)).
 		Bold(false)
 
 	tMovies.SetStyles(s)
@@ -64,7 +65,7 @@ func InitialModel() model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Points
 	sp.Spinner.FPS = time.Second / 4
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(configuration.SpinnerColor))
 
 	return model{
 		tableMovies:    tMovies,
