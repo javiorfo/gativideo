@@ -1,5 +1,6 @@
 [yts]
 host = "https://en.yts-official.mx"
+init_searth = true
 order_by = "rating"
 quality = 1080
 

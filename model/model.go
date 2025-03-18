@@ -146,7 +146,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "ctrl+d":
+		case "ctrl+r":
 			if m.downloader != nil && m.downloader.Downloading {
 				once.Do(func() { close(m.cancelDownload) })
 			}
@@ -163,7 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
-		case "ctrl+b":
+		case "ctrl+p":
 			if m.page > 1 {
 				m.loading = true
 				m.page -= 1
@@ -193,7 +193,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return m, cmd
-		case "ctrl+a":
+		case "ctrl+d":
 			tFile := m.getTorrentFileLink()
 			if m.showSubs && tFile.IsPresent() {
 				subCode := m.getSubtitleCode()

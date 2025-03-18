@@ -138,17 +138,17 @@ func MovieTorrentName(torrentPath string) (string, error) {
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read torrent data: %w", err)
+		return "", err
 	}
 
 	mi, err := metainfo.Load(bytes.NewReader(data))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse torrent metadata: %w", err)
+		return "", err
 	}
 
 	info, err := mi.UnmarshalInfo()
 	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal info: %w", err)
+		return "", err
 	}
 
 	return info.Name, nil

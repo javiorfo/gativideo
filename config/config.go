@@ -21,6 +21,7 @@ const (
 type config struct {
 	YTSHost               string
 	YTSQuality            int64
+	YTSInitSearch         bool
 	YTSOrderBy            string
 	OpenSubsEnable        bool
 	OpenSubsLanguage      string
@@ -36,6 +37,7 @@ func defaultConfig() config {
 	return config{
 		YTSHost:               defaultYTSHost,
 		YTSQuality:            defaultYTSQuality,
+		YTSInitSearch:         true,
 		YTSOrderBy:            defaultYTSOrderBy,
 		OpenSubsLanguage:      defaultOpenSubsLanguage,
 		TableBorderColor:      defaultTableBorderColor,
@@ -56,6 +58,7 @@ func GetConfiguration() config {
 	return config{
 		YTSHost:               tomlFile.GetDefault("yts.host", defaultYTSHost).(string),
 		YTSQuality:            tomlFile.GetDefault("yts.quality", defaultYTSQuality).(int64),
+		YTSInitSearch:         tomlFile.GetDefault("yts.init_search", true).(bool),
 		YTSOrderBy:            tomlFile.GetDefault("yts.order_by", defaultYTSOrderBy).(string),
 		OpenSubsEnable:        tomlFile.GetDefault("opensubs.enable", false).(bool),
 		OpenSubsLanguage:      tomlFile.GetDefault("opensubs.language", defaultOpenSubsLanguage).(string),
