@@ -136,7 +136,10 @@ func (m *model) download() tea.Msg {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.request(1), m.download)
+	if configuration.YTSInitSearch {
+		return tea.Batch(m.spinner.Tick, m.request(1), m.download)
+	}
+	return tea.Sequence(m.download)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
