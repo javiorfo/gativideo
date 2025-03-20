@@ -69,6 +69,7 @@ func InitialModel() model {
 
 	return model{
 		tableMovies:    tMovies,
+		initSearch:     configuration.YTSInitSearch,
 		tableSubs:      tSubs,
 		textInput:      ti,
 		spinner:        sp,

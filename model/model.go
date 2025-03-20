@@ -20,6 +20,7 @@ import (
 type model struct {
 	tableMovies       table.Model
 	filteredRows      []table.Row
+	initSearch        bool
 	movies            []yts.Movie
 	total             int
 	page              int
@@ -136,7 +137,7 @@ func (m *model) download() tea.Msg {
 }
 
 func (m model) Init() tea.Cmd {
-	if configuration.YTSInitSearch {
+	if m.initSearch {
 		return tea.Batch(m.spinner.Tick, m.request(1), m.download)
 	}
 	return tea.Sequence(m.download)
@@ -179,6 +180,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.spinner.Tick, m.request(m.page))
 		case "enter":
 			m.loading = true
+			m.initSearch = true
 
 			if m.showSubs {
 				m.toggleTables()
@@ -252,7 +254,7 @@ func (m model) View() string {
 	}
 
 	var sp string
-	if m.loading {
+	if m.loading && m.initSearch {
 		sp = m.spinner.View() + " searching movies\n"
 	}
 

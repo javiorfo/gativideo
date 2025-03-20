@@ -104,11 +104,6 @@ func (d *Downloader) purge() error {
 		return err
 	}
 
-	err := os.Rename(subtitlePath, subtitleDestPath)
-	if err != nil {
-		return err
-	}
-
 	files, err := os.ReadDir(movieTorrentDir)
 	if err != nil {
 		return err
@@ -126,6 +121,12 @@ func (d *Downloader) purge() error {
 			}
 		}
 	}
+
+	err = os.Rename(subtitlePath, subtitleDestPath)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
