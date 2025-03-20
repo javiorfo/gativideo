@@ -77,6 +77,7 @@ func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
 			Status = OnDownload(fmt.Sprintf("  %s Canceled!", t.Name()))
 			_ = os.Remove(d.torrentPath)
 			_ = os.RemoveAll(filepath.Join(configuration.DownloadFolder, d.torrentName))
+			d.Downloading = false
 			return
 		default:
 			stats := t.Stats()
@@ -95,7 +96,9 @@ func (d *Downloader) downloadMovie(cancelDownload <-chan struct{}) {
 }
 
 func (d *Downloader) purge() error {
+	d.Downloading = false
 	_ = os.Remove(d.torrentPath)
+
 	movieTorrentDir := filepath.Join(configuration.DownloadFolder, d.torrentName)
 	subtitlePath := movieTorrentDir + ".srt"
 	subtitleDestPath := filepath.Join(movieTorrentDir, d.torrentName+".srt")
