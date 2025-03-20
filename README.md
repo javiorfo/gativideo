@@ -57,6 +57,7 @@ yay -S bitsmuggler
 #### Using filters
 - **order** filter could be: *latest, oldest, rating, alphabetical, featured, year or likes*
 <img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler-filters.gif?raw=true" alt="bitsmuggler"/>
+
 ---
 
 ### Donate
