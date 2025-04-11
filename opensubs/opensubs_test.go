@@ -14,3 +14,16 @@ func TestOpenSubs(t *testing.T) {
 		t.Fatal("code must not be empty")
 	}
 }
+
+func TestCleanString(t *testing.T) {
+	s := getOpenSubsMovieName("Movie: Name")
+
+	if s != "movie-name" {
+		t.Fatalf("Result %s", s)
+	}
+
+	s = getOpenSubsMovieName("Movie, Name. 1990")
+	if s != "movie-name-1990" {
+		t.Fatalf("Result %s", s)
+	}
+}

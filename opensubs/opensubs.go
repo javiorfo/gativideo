@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -47,7 +48,7 @@ func (s Subtitle) GetDownloadSubtitleCode() string {
 }
 
 func GetSubs(movieYear, movieName string) ([]Subtitle, error) {
-	movieName = strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(movieName), " ", "-"), ":", "")
+	movieName = getOpenSubsMovieName(movieName)
 
 	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
 	resp, err := http.Get(url)
@@ -98,6 +99,11 @@ func sorted(s1 Subtitle, s2 Subtitle) bool {
 	a, _ := strconv.Atoi(s1.Downloads)
 	b, _ := strconv.Atoi(s2.Downloads)
 	return a > b
+}
+
+func getOpenSubsMovieName(input string) string {
+	re := regexp.MustCompile(`[.,:]`).ReplaceAllString(input, "")
+	return strings.ReplaceAll(strings.ToLower(re), " ", "-")
 }
 
 func DownloadSubtitle(code, movieName string) error {
