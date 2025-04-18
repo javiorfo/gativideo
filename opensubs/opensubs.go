@@ -50,7 +50,7 @@ func (s Subtitle) GetDownloadSubtitleCode() string {
 func GetSubs(movieYear, movieName string) ([]Subtitle, error) {
 	movieName = getOpenSubsMovieName(movieName)
 
-	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
+	url := fmt.Sprintf("https://www.opensubtitles.com/%s/%s/features/%s-%s/subtitles_list.json", configuration.OpenSubsLanguage, configuration.OpenSubsLanguage, movieYear, movieName)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
