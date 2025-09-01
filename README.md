@@ -1,4 +1,4 @@
-# bitsmuggler
+# gativideo
 *TUI app to download YTS movies and opensubtitles subs*
 
 ## Caveats
