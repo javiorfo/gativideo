@@ -5,6 +5,8 @@ use ratatui::{
 };
 use yts_movies::{Filters, Response, Yts};
 
+use crate::elements::Focus;
+
 #[derive(Debug)]
 pub struct MovieTable {
     pub table: TableState,
@@ -30,6 +32,14 @@ impl Default for MovieTable {
 impl MovieTable {
     const TITLE: &'static str = " YTS MOVIES ";
 
+    pub fn own_focus(&self) -> Focus {
+        Focus::MovieTable
+    }
+
+    pub fn next_focus(&self) -> Focus {
+        Focus::InputBox
+    }
+
     pub fn footer(&self) -> String {
         match self.response {
             Some(ref r) => {
@@ -53,10 +63,27 @@ impl MovieTable {
         Ok(())
     }
 
-    pub fn response_to_rows(&self) -> Vec<Row> {
+    pub async fn next_page(&mut self, text: &str) -> yts_movies::Result {
+        let response = self.response.as_ref().unwrap();
+        let next_page = response.page.current + 1;
+        if next_page <= response.page.of {
+            self.response = Some(
+                self.yts
+                    .search_with_filter(text, Filters::default().page(next_page).build())
+                    .await?,
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
-        let response = self.response.as_ref().unwrap();
+        let Some(response) = self.response.as_ref() else {
+            return vec![];
+        };
+
         for movie in &response.movies {
             let genres = movie
                 .genres
@@ -78,7 +105,7 @@ impl MovieTable {
             .collect::<Vec<_>>()
     }
 
-    pub fn render(&mut self, border_style: Style) -> Table {
+    pub fn render(&mut self, border_style: Style) -> Table<'_> {
         let header = Row::new(["Year", "Name", "Genre", "Rating"])
             .style(Style::new().dark_gray().bold())
             .bottom_margin(0);
@@ -98,7 +125,6 @@ impl MovieTable {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_type(BorderType::Thick)
-                    //                 .border_style(Style::new().dark_gray())
                     .border_style(border_style)
                     .title(Self::TITLE)
                     .title_style(Style::new().white().bold())

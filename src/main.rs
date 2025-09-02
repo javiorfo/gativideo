@@ -1,68 +1,51 @@
 use color_eyre::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::widgets::{Block, BorderType, Borders, Paragraph, Row, Table, TableState};
-use yts_movies::Filters;
+use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 
 mod elements;
 
 use elements::Focus;
 
-use crate::elements::InputBox;
+use crate::elements::{InputBox, MovieTable};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut table_state = TableState::default();
-    table_state.select_first();
-    table_state.select_first_column();
     let mut terminal = ratatui::init();
 
     let mut focus = Focus::default();
     let mut input_box = InputBox::default();
-
-    let yts = yts_movies::Yts::default();
-
-    let mut response: yts_movies::Response = yts
-        .search_with_filter("", Filters::default().build())
-        .await
-        .expect("error");
+    let mut movie_table = MovieTable::default();
 
     loop {
-        terminal.draw(|frame| render(frame, &mut table_state, &focus, &input_box, &response))?;
+        terminal.draw(|frame| render(frame, &mut movie_table, &focus, &input_box))?;
         if let Some(key) = event::read()?.as_key_press_event() {
             match focus {
                 Focus::MovieTable => match key.code {
                     KeyCode::Tab => {
-                        focus = Focus::InputBox;
+                        focus = movie_table.next_focus();
                     }
                     KeyCode::Char('q') | KeyCode::Esc => {
                         ratatui::restore();
                         return Ok(());
                     }
-                    KeyCode::Char('j') | KeyCode::Down => table_state.select_next(),
-                    KeyCode::Char('k') | KeyCode::Up => table_state.select_previous(),
+                    KeyCode::Char('j') | KeyCode::Down => movie_table.table.select_next(),
+                    KeyCode::Char('k') | KeyCode::Up => movie_table.table.select_previous(),
                     KeyCode::Char('l') | KeyCode::Right => {
-                        let next_page = response.page.current + 1;
-                        if next_page < response.page.of {
-                            response = yts
-                                .search_with_filter(
-                                    &input_box.text,
-                                    Filters::default().page(next_page).build(),
-                                )
-                                .await
-                                .expect("error");
-                        }
+                        movie_table.next_page(&input_box.text).await.expect("");
                     }
-                    KeyCode::Char('h') | KeyCode::Left => table_state.select_previous_column(),
-                    KeyCode::Char('g') => table_state.select_first(),
-                    KeyCode::Char('G') => table_state.select_last(),
+                    KeyCode::Char('h') | KeyCode::Left => {
+                        movie_table.table.select_previous_column()
+                    }
+                    KeyCode::Char('g') => movie_table.table.select_first(),
+                    KeyCode::Char('G') => movie_table.table.select_last(),
                     KeyCode::Enter => {
-                        let selected = table_state.selected().unwrap();
-                        println!("{}", response.movies[selected].name);
+                        let selected = movie_table.table.selected().unwrap();
+                        //                         println!("{}", response.movies[selected].name);
                     }
                     _ => {}
                 },
@@ -71,11 +54,7 @@ async fn main() -> Result<()> {
                         focus = input_box.next_focus();
                     }
                     KeyCode::Enter => {
-                        response = yts
-                            .search_with_filter(&input_box.text, Filters::default().build())
-                            .await
-                            .expect("error");
-
+                        movie_table.search(&input_box.text).await.expect("");
                         focus = input_box.next_focus();
                     }
                     KeyCode::Char(c) => {
@@ -98,13 +77,7 @@ async fn main() -> Result<()> {
     }
 }
 
-fn render(
-    frame: &mut Frame,
-    table_state: &mut TableState,
-    focus: &Focus,
-    input_box: &InputBox,
-    response: &yts_movies::Response,
-) {
+fn render(frame: &mut Frame, movie_table: &mut MovieTable, focus: &Focus, input_box: &InputBox) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -147,7 +120,7 @@ fn render(
         ));
     }
 
-    let table_border_style = if matches!(focus, Focus::MovieTable) {
+    let table_border_style = if focus == &movie_table.own_focus() {
         Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD)
@@ -155,82 +128,7 @@ fn render(
         Style::default().fg(Color::DarkGray)
     };
 
-    render_table(frame, main, table_state, table_border_style, response);
-}
-
-pub fn render_table(
-    frame: &mut Frame,
-    area: Rect,
-    table_state: &mut TableState,
-    border_style: Style,
-    response: &yts_movies::Response,
-) {
-    let header = Row::new(["Year", "Name", "Genre", "Rating"])
-        .style(Style::new().dark_gray().bold())
-        .bottom_margin(0);
-
-    let widths = [
-        Constraint::Percentage(10),
-        Constraint::Percentage(50),
-        Constraint::Percentage(30),
-        Constraint::Percentage(10),
-    ];
-
-    let mut rows: Vec<Vec<String>> = Vec::new();
-    for movie in &response.movies {
-        let genres = movie
-            .genres
-            .iter()
-            .map(|g| g.to_string())
-            .collect::<Vec<String>>()
-            .join("/");
-        rows.push(vec![
-            movie.year.to_string(),
-            movie.name.clone(),
-            genres,
-            movie.rating.to_string(),
-        ]);
-    }
-
-    let rows: Vec<Row> = rows
-        .iter()
-        .map(|item| Row::new(item.iter().cloned()))
-        .collect();
-
-    let footer = format!(
-        " {} Movie/s - Page {}/{} ",
-        response.page.total, response.page.current, response.page.of
-    );
-
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Thick)
-                //                 .border_style(Style::new().dark_gray())
-                .border_style(border_style)
-                .title(" YTS MOVIES ")
-                .title_style(Style::new().white().bold())
-                .title_alignment(ratatui::layout::Alignment::Center)
-                .title_bottom(footer),
-        )
-        .column_spacing(1)
-        .style(Style::default().fg(Color::White))
-        .row_highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
-        )
-        .column_highlight_style(Color::Gray)
-        .cell_highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("  ");
-
-    frame.render_stateful_widget(table, area, table_state);
+    let mut table_state = movie_table.table.clone();
+    let table = movie_table.render(table_border_style);
+    frame.render_stateful_widget(table, main, &mut table_state);
 }
