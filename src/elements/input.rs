@@ -1,4 +1,9 @@
-use crate::Focus;
+use ratatui::{
+    style::{Color, Modifier, Style},
+    widgets::{Block, BorderType, Borders, Paragraph},
+};
+
+use crate::elements::Focus;
 
 #[derive(Debug, Default)]
 pub struct InputBox {
@@ -6,11 +11,23 @@ pub struct InputBox {
 }
 
 impl InputBox {
-    pub fn own_focus(&self) -> Focus {
-        Focus::InputBox
-    }
+    pub fn render(&self, focus: &Focus) -> Paragraph<'_> {
+        let style = if matches!(focus, Focus::InputBox) {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
 
-    pub fn next_focus(&self) -> Focus {
-        Focus::MovieTable
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Thick)
+            .border_style(style)
+            .title(" Search movie ");
+
+        Paragraph::new(self.text.clone())
+            .style(Style::default().fg(Color::Yellow))
+            .block(block)
     }
 }

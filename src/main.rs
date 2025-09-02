@@ -1,15 +1,14 @@
 use color_eyre::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+use ratatui::layout::{Constraint, Layout};
+use ratatui::widgets::Clear;
 
 mod elements;
 
 use elements::Focus;
 
-use crate::elements::{InputBox, MovieTable};
+use crate::elements::{InputBox, MovieTable, Popup};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,17 +16,38 @@ async fn main() -> Result<()> {
 
     let mut terminal = ratatui::init();
 
+    let mut show_popup = false;
     let mut focus = Focus::default();
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::default();
 
     loop {
-        terminal.draw(|frame| render(frame, &mut movie_table, &focus, &input_box))?;
+        terminal.draw(|frame| render(frame, &mut movie_table, &focus, &input_box, show_popup))?;
         if let Some(key) = event::read()?.as_key_press_event() {
             match focus {
+                Focus::InputBox => match key.code {
+                    KeyCode::Tab => {
+                        focus = Focus::MovieTable;
+                    }
+                    KeyCode::Enter => {
+                        movie_table.search(&input_box.text).await.expect("");
+                        focus = Focus::MovieTable;
+                    }
+                    KeyCode::Char(c) => {
+                        input_box.text.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        input_box.text.pop();
+                    }
+                    KeyCode::Esc => {
+                        ratatui::restore();
+                        return Ok(());
+                    }
+                    _ => {}
+                },
                 Focus::MovieTable => match key.code {
                     KeyCode::Tab => {
-                        focus = movie_table.next_focus();
+                        focus = Focus::InputBox;
                     }
                     KeyCode::Char('q') | KeyCode::Esc => {
                         ratatui::restore();
@@ -44,32 +64,24 @@ async fn main() -> Result<()> {
                     KeyCode::Char('g') => movie_table.table.select_first(),
                     KeyCode::Char('G') => movie_table.table.select_last(),
                     KeyCode::Enter => {
-                        let selected = movie_table.table.selected().unwrap();
+                        let _selected = movie_table.table.selected().unwrap();
                         //                         println!("{}", response.movies[selected].name);
                     }
-                    _ => {}
-                },
-                Focus::InputBox => match key.code {
-                    KeyCode::Tab => {
-                        focus = input_box.next_focus();
-                    }
-                    KeyCode::Enter => {
-                        movie_table.search(&input_box.text).await.expect("");
-                        focus = input_box.next_focus();
-                    }
-                    KeyCode::Char(c) => {
-                        input_box.text.push(c);
-                    }
-                    KeyCode::Backspace => {
-                        input_box.text.pop();
-                    }
-                    KeyCode::Esc => {
-                        ratatui::restore();
-                        return Ok(());
+                    KeyCode::Char('t') => {
+                        show_popup = true;
+                        focus = Focus::TorrentPopup;
                     }
                     _ => {}
                 },
+
                 Focus::TorrentTable => match key.code {
+                    _ => {}
+                },
+                Focus::TorrentPopup => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        show_popup = false;
+                        focus = Focus::MovieTable;
+                    }
                     _ => {}
                 },
             }
@@ -77,58 +89,35 @@ async fn main() -> Result<()> {
     }
 }
 
-fn render(frame: &mut Frame, movie_table: &mut MovieTable, focus: &Focus, input_box: &InputBox) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(3),
-                Constraint::Percentage(42),
-                Constraint::Min(0),
-            ]
-            .as_ref(),
-        )
-        .spacing(1)
-        .split(frame.area());
+fn render(
+    frame: &mut Frame,
+    movie_table: &mut MovieTable,
+    focus: &Focus,
+    input_box: &InputBox,
+    show_popup_torrents: bool,
+) {
+    let mut table_state = movie_table.table;
+    let (table, constraint) = movie_table.render(focus);
 
-    let top = chunks[0];
-    let main = chunks[1];
+    let area = frame.area();
+    let layout = Layout::vertical([Constraint::Length(3), constraint]);
+    let [input_box_area, movie_table_area] = area.layout(&layout);
 
-    let input_border_style = if focus == &input_box.own_focus() {
-        Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
+    frame.render_widget(input_box.render(focus), input_box_area);
 
-    let input_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Thick)
-        .border_style(input_border_style)
-        .title("Input");
-
-    let paragraph = Paragraph::new(input_box.text.clone())
-        .style(Style::default().fg(Color::Yellow))
-        .block(input_block);
-    frame.render_widget(paragraph, top);
-
-    if focus == &input_box.own_focus() {
+    if matches!(focus, Focus::InputBox) {
         frame.set_cursor_position((
-            chunks[0].x + input_box.text.len() as u16 + 1,
-            chunks[0].y + 1,
+            input_box_area.x + input_box.text.len() as u16 + 1,
+            input_box_area.y + 1,
         ));
     }
 
-    let table_border_style = if focus == &movie_table.own_focus() {
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
+    frame.render_stateful_widget(table, movie_table_area, &mut table_state);
 
-    let mut table_state = movie_table.table.clone();
-    let table = movie_table.render(table_border_style);
-    frame.render_stateful_widget(table, main, &mut table_state);
+    if show_popup_torrents {
+        let popup = Popup::new(" Torrents ");
+        let popup_area = popup.centered_area(area, 60, 40);
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup.table(), popup_area);
+    }
 }

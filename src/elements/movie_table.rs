@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Constraint,
-    style::{Color, Modifier, Style, Stylize},
+    style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
 };
 use yts_movies::{Filters, Response, Yts};
@@ -31,14 +31,6 @@ impl Default for MovieTable {
 
 impl MovieTable {
     const TITLE: &'static str = " YTS MOVIES ";
-
-    pub fn own_focus(&self) -> Focus {
-        Focus::MovieTable
-    }
-
-    pub fn next_focus(&self) -> Focus {
-        Focus::InputBox
-    }
 
     pub fn footer(&self) -> String {
         match self.response {
@@ -77,7 +69,7 @@ impl MovieTable {
         Ok(())
     }
 
-    pub fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
+    fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
         let Some(response) = self.response.as_ref() else {
@@ -105,8 +97,19 @@ impl MovieTable {
             .collect::<Vec<_>>()
     }
 
-    pub fn render(&mut self, border_style: Style) -> Table<'_> {
-        let header = Row::new(["Year", "Name", "Genre", "Rating"])
+    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, Constraint) {
+        let rows = self.response_to_rows();
+
+        let (header, constraint) = if !rows.is_empty() {
+            (
+                ["Year", "Name", "Genre", "Rating"],
+                Constraint::Length(rows.len() as u16 + 3),
+            )
+        } else {
+            (["", "", "", ""], Constraint::Length(2))
+        };
+
+        let header = Row::new(header)
             .style(Style::new().dark_gray().bold())
             .bottom_margin(0);
 
@@ -117,35 +120,44 @@ impl MovieTable {
             Constraint::Percentage(10),
         ];
 
-        let rows = self.response_to_rows();
+        let border_style = if matches!(focus, Focus::MovieTable) {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
 
-        Table::new(rows, widths)
-            .header(header)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Thick)
-                    .border_style(border_style)
-                    .title(Self::TITLE)
-                    .title_style(Style::new().white().bold())
-                    .title_alignment(ratatui::layout::Alignment::Center)
-                    .title_bottom(self.footer()),
-            )
-            .column_spacing(1)
-            .style(Style::default().fg(Color::White))
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .column_highlight_style(Color::Gray)
-            .cell_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("  ")
+        (
+            Table::new(rows, widths)
+                .header(header)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Thick)
+                        .border_style(border_style)
+                        .title(Self::TITLE)
+                        .title_style(Style::new().white().bold())
+                        .title_alignment(ratatui::layout::Alignment::Center)
+                        .title_bottom(self.footer()),
+                )
+                .column_spacing(1)
+                .style(Style::default().fg(Color::White))
+                .row_highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .column_highlight_style(Color::Gray)
+                .cell_highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol("  "),
+            constraint,
+        )
     }
 }
