@@ -8,7 +8,7 @@ mod elements;
 
 use elements::Focus;
 
-use crate::elements::{InputBox, MovieTable, Popup};
+use crate::elements::{InputBox, MovieTable, PopupTorrent};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,13 +16,14 @@ async fn main() -> Result<()> {
 
     let mut terminal = ratatui::init();
 
-    let mut show_popup = false;
     let mut focus = Focus::default();
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::default();
+    let mut popup_torrent = PopupTorrent::new(" Torrents ", " Enter to download ");
 
     loop {
-        terminal.draw(|frame| render(frame, &mut movie_table, &focus, &input_box, show_popup))?;
+        terminal
+            .draw(|frame| render(frame, &mut movie_table, &focus, &input_box, &popup_torrent))?;
         if let Some(key) = event::read()?.as_key_press_event() {
             match focus {
                 Focus::InputBox => match key.code {
@@ -53,23 +54,26 @@ async fn main() -> Result<()> {
                         ratatui::restore();
                         return Ok(());
                     }
-                    KeyCode::Char('j') | KeyCode::Down => movie_table.table.select_next(),
-                    KeyCode::Char('k') | KeyCode::Up => movie_table.table.select_previous(),
+                    KeyCode::Char('j') | KeyCode::Down => movie_table.table_state.select_next(),
+                    KeyCode::Char('k') | KeyCode::Up => movie_table.table_state.select_previous(),
                     KeyCode::Char('l') | KeyCode::Right => {
                         movie_table.next_page(&input_box.text).await.expect("");
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
-                        movie_table.table.select_previous_column()
+                        movie_table.table_state.select_previous_column()
                     }
-                    KeyCode::Char('g') => movie_table.table.select_first(),
-                    KeyCode::Char('G') => movie_table.table.select_last(),
-                    KeyCode::Enter => {
-                        let _selected = movie_table.table.selected().unwrap();
-                        //                         println!("{}", response.movies[selected].name);
-                    }
+                    KeyCode::Char('g') => movie_table.table_state.select_first(),
+                    KeyCode::Char('G') => movie_table.table_state.select_last(),
                     KeyCode::Char('t') => {
-                        show_popup = true;
-                        focus = Focus::TorrentPopup;
+                        if let Some(selected) = movie_table.table_state.selected()
+                            && !movie_table.response.movies.is_empty()
+                        {
+                            let movie = &movie_table.response.movies[selected];
+                            popup_torrent.search_torrents(movie).await.unwrap();
+
+                            popup_torrent.popup.show = true;
+                            focus = Focus::TorrentPopup;
+                        }
                     }
                     _ => {}
                 },
@@ -78,9 +82,18 @@ async fn main() -> Result<()> {
                     _ => {}
                 },
                 Focus::TorrentPopup => match key.code {
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        popup_torrent.popup.table_state.select_next()
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        popup_torrent.popup.table_state.select_previous()
+                    }
                     KeyCode::Char('q') | KeyCode::Esc => {
-                        show_popup = false;
+                        popup_torrent.popup.show = false;
                         focus = Focus::MovieTable;
+                    }
+                    KeyCode::Enter => {
+                        todo!("download movie")
                     }
                     _ => {}
                 },
@@ -94,9 +107,9 @@ fn render(
     movie_table: &mut MovieTable,
     focus: &Focus,
     input_box: &InputBox,
-    show_popup_torrents: bool,
+    popup_torrent: &PopupTorrent,
 ) {
-    let mut table_state = movie_table.table;
+    let mut table_state = movie_table.table_state;
     let (table, constraint) = movie_table.render(focus);
 
     let area = frame.area();
@@ -114,10 +127,10 @@ fn render(
 
     frame.render_stateful_widget(table, movie_table_area, &mut table_state);
 
-    if show_popup_torrents {
-        let popup = Popup::new(" Torrents ");
-        let popup_area = popup.centered_area(area, 60, 40);
+    if popup_torrent.popup.show {
+        let popup_area = popup_torrent.area(movie_table_area);
+        let mut table_state = popup_torrent.popup.table_state;
         frame.render_widget(Clear, popup_area);
-        frame.render_widget(popup.table(), popup_area);
+        frame.render_stateful_widget(popup_torrent.content(), popup_area, &mut table_state);
     }
 }

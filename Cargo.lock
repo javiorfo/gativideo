@@ -698,11 +698,10 @@ version = "0.1.0"
 dependencies = [
  "color-eyre",
  "crossterm",
- "itertools 0.14.0",
+ "opensubs",
  "ratatui",
  "tokio",
  "transmission-rpc",
- "unicode-width",
  "yts-movies",
 ]
 
@@ -1483,6 +1482,19 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "opensubs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8493271de26b9c521894f4d886ac48db9451c3c843a2b71f0abd25b5d34063e"
+dependencies = [
+ "regex",
+ "reqwest",
+ "scraper",
+ "thiserror 2.0.12",
+ "tokio",
 ]
 
 [[package]]

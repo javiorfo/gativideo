@@ -3,28 +3,34 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
 };
-use yts_movies::{Filters, Response, Yts};
+use yts_movies::{Filters, Page, Response, Torrent, Yts};
 
 use crate::elements::Focus;
 
 #[derive(Debug)]
 pub struct MovieTable {
-    pub table: TableState,
-    pub response: Option<Response>,
+    pub table_state: TableState,
+    pub response: Response,
     yts: Yts<'static>,
 }
 
 impl Default for MovieTable {
     fn default() -> Self {
-        let mut table = TableState::default();
-        table.select_first();
-        table.select_first_column();
-        let yts = Yts::default();
+        let mut table_state = TableState::default();
+        table_state.select_first();
+        table_state.select_first_column();
 
         Self {
-            table,
-            response: None,
-            yts,
+            table_state,
+            response: Response {
+                page: Page {
+                    current: 0,
+                    of: 0,
+                    total: 0,
+                },
+                movies: vec![],
+            },
+            yts: Yts::default(),
         }
     }
 }
@@ -33,14 +39,14 @@ impl MovieTable {
     const TITLE: &'static str = " YTS MOVIES ";
 
     pub fn footer(&self) -> String {
-        match self.response {
-            Some(ref r) => {
-                format!(
-                    " {} Movie/s - Page {}/{} ",
-                    r.page.total, r.page.current, r.page.of
-                )
-            }
-            None => String::from(" 0 Movie/s - Page 0/0 "),
+        let page = &self.response.page;
+        if page.total != 0 {
+            format!(
+                " {} Movie/s - Page {}/{} ",
+                page.total, page.current, page.of
+            )
+        } else {
+            String::from(" 0 Movie/s - Page 0/0 ")
         }
     }
 
@@ -50,20 +56,26 @@ impl MovieTable {
             .search_with_filter(text, Filters::default().build())
             .await?;
 
-        self.response = Some(response);
+        self.response = response;
 
         Ok(())
     }
 
+    pub async fn search_torrents_by_movie(
+        &mut self,
+        index: usize,
+    ) -> yts_movies::Result<Vec<Torrent>> {
+        self.yts.torrents(&self.response.movies[index]).await
+    }
+
     pub async fn next_page(&mut self, text: &str) -> yts_movies::Result {
-        let response = self.response.as_ref().unwrap();
+        let response = &self.response;
         let next_page = response.page.current + 1;
         if next_page <= response.page.of {
-            self.response = Some(
-                self.yts
-                    .search_with_filter(text, Filters::default().page(next_page).build())
-                    .await?,
-            );
+            self.response = self
+                .yts
+                .search_with_filter(text, Filters::default().page(next_page).build())
+                .await?;
         }
 
         Ok(())
@@ -72,11 +84,11 @@ impl MovieTable {
     fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
-        let Some(response) = self.response.as_ref() else {
+        if self.response.page.total == 0 {
             return vec![];
         };
 
-        for movie in &response.movies {
+        for movie in &self.response.movies {
             let genres = movie
                 .genres
                 .iter()
@@ -103,7 +115,7 @@ impl MovieTable {
         let (header, constraint) = if !rows.is_empty() {
             (
                 ["Year", "Name", "Genre", "Rating"],
-                Constraint::Length(rows.len() as u16 + 3),
+                Constraint::Length(rows.len() as u16 + 4),
             )
         } else {
             (["", "", "", ""], Constraint::Length(2))

@@ -1,47 +1,107 @@
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Row, Table},
+    widgets::{Block, BorderType, Borders, Row, Table, TableState},
 };
+use yts_movies::{Movie, Torrent, Yts};
 
 pub struct Popup<'a> {
-    pub title: &'a str,
+    pub table_state: TableState,
+    pub show: bool,
+    title: &'a str,
+    footer: &'a str,
 }
 
 impl<'a> Popup<'a> {
-    pub fn new(title: &'a str) -> Popup<'a> {
-        Self { title }
+    pub fn new(title: &'a str, footer: &'a str) -> Popup<'a> {
+        let mut table_state = TableState::default();
+        table_state.select_first();
+        table_state.select_first_column();
+
+        Self {
+            title,
+            footer,
+            table_state,
+            show: false,
+        }
     }
 
-    pub fn block(&self) -> Block<'a> {
-        Block::bordered()
-            .title(self.title)
-            .title_bottom(" Press Enter to start download ")
-            .title_style(Style::new().white().bold())
-            .title_alignment(ratatui::layout::Alignment::Center)
+    pub fn centered_area(&self, area: Rect, x: u16, y: u16) -> Rect {
+        let vertical = Layout::vertical([Constraint::Length(y)]).flex(Flex::Center);
+        let horizontal = Layout::horizontal([Constraint::Length(x)]).flex(Flex::Center);
+        let [area] = area.layout(&vertical);
+        let [area] = area.layout(&horizontal);
+        area
+    }
+}
+
+pub struct PopupTorrent<'a> {
+    pub popup: Popup<'a>,
+    yts: Yts<'a>,
+    torrents: Vec<Torrent>,
+}
+
+impl<'a> PopupTorrent<'a> {
+    pub fn new(title: &'a str, footer: &'a str) -> PopupTorrent<'a> {
+        Self {
+            popup: Popup::new(title, footer),
+            yts: Yts::default(),
+            torrents: vec![],
+        }
     }
 
-    pub fn table(&self) -> Table<'a> {
+    pub fn area(&self, area: Rect) -> Rect {
+        self.popup.centered_area(area, 70, 5)
+    }
+
+    pub async fn search_torrents(&mut self, movie: &Movie) -> yts_movies::Result {
+        self.torrents = self.yts.torrents(movie).await?;
+        Ok(())
+    }
+
+    pub fn content(&self) -> Table<'a> {
         let widths = [
-            Constraint::Percentage(10),
-            Constraint::Percentage(50),
+            Constraint::Percentage(15),
+            Constraint::Percentage(15),
             Constraint::Percentage(30),
-            Constraint::Percentage(10),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
         ];
-        let header = Row::new(["Year", "Name", "Genre", "Rating"])
+
+        let header = Row::new(["Quality", "Size", "Language", "Runtime", "Peers/Seeds"])
             .style(Style::new().dark_gray().bold())
             .bottom_margin(0);
 
-        Table::new([Row::new(["Year", "Name", "Genre", "Rating"])], widths)
+        let mut rows: Vec<Vec<String>> = Vec::new();
+
+        for torrent in &self.torrents {
+            let quality = &torrent.quality;
+            let quality: &str = quality.into();
+
+            rows.push(vec![
+                quality.to_owned(),
+                torrent.size.clone(),
+                torrent.language.clone(),
+                torrent.runtime.clone(),
+                torrent.peers_seeds.clone(),
+            ]);
+        }
+
+        let rows = rows
+            .iter()
+            .map(|item| Row::new(item.iter().cloned()))
+            .collect::<Vec<_>>();
+
+        Table::new(rows, widths)
             .header(header)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Thick)
-                    .title(" Torrents ")
+                    .border_type(BorderType::Plain)
+                    .title(self.popup.title)
                     .title_style(Style::new().white().bold())
                     .title_alignment(ratatui::layout::Alignment::Center)
-                    .title_bottom(" footer "),
+                    .title_bottom(self.popup.footer),
             )
             .column_spacing(1)
             .style(Style::default().fg(Color::White))
@@ -58,14 +118,6 @@ impl<'a> Popup<'a> {
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD),
             )
-            .highlight_symbol("  ")
-    }
-
-    pub fn centered_area(&self, area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-        let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-        let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
-        let [area] = area.layout(&vertical);
-        let [area] = area.layout(&horizontal);
-        area
+            .highlight_symbol(" ")
     }
 }
