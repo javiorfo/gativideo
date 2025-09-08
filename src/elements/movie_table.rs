@@ -3,7 +3,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
 };
-use yts_movies::{Filters, Page, Response, Torrent, Yts};
+use yts_movies::{Filters, Page, Response, Yts};
 
 use crate::elements::Focus;
 
@@ -59,13 +59,6 @@ impl MovieTable {
         self.response = response;
 
         Ok(())
-    }
-
-    pub async fn search_torrents_by_movie(
-        &mut self,
-        index: usize,
-    ) -> yts_movies::Result<Vec<Torrent>> {
-        self.yts.torrents(&self.response.movies[index]).await
     }
 
     pub async fn next_page(&mut self, text: &str) -> yts_movies::Result {

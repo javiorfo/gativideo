@@ -37,8 +37,8 @@ impl<'a> Popup<'a> {
 
 pub struct PopupTorrent<'a> {
     pub popup: Popup<'a>,
+    pub torrents: Vec<Torrent>,
     yts: Yts<'a>,
-    torrents: Vec<Torrent>,
 }
 
 impl<'a> PopupTorrent<'a> {

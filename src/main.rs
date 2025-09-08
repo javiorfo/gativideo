@@ -4,10 +4,12 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::widgets::Clear;
 
+mod downloads;
 mod elements;
 
 use elements::Focus;
 
+use crate::downloads::Transmission;
 use crate::elements::{InputBox, MovieTable, PopupTorrent};
 
 #[tokio::main]
@@ -20,10 +22,25 @@ async fn main() -> Result<()> {
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::default();
     let mut popup_torrent = PopupTorrent::new(" Torrents ", " Enter to download ");
+    let mut transmission = Transmission::new(
+        "http://127.0.0.1:9091/transmission/rpc",
+        "/home/javier/Downloads/movies",
+    );
+
+    transmission.scan().await.unwrap();
 
     loop {
-        terminal
-            .draw(|frame| render(frame, &mut movie_table, &focus, &input_box, &popup_torrent))?;
+        terminal.draw(|frame| {
+            render(
+                frame,
+                &mut movie_table,
+                &focus,
+                &input_box,
+                &popup_torrent,
+                &mut transmission,
+            )
+        })?;
+
         if let Some(key) = event::read()?.as_key_press_event() {
             match focus {
                 Focus::InputBox => match key.code {
@@ -48,7 +65,11 @@ async fn main() -> Result<()> {
                 },
                 Focus::MovieTable => match key.code {
                     KeyCode::Tab => {
-                        focus = Focus::InputBox;
+                        focus = if transmission.is_visible() {
+                            Focus::TorrentTable
+                        } else {
+                            Focus::InputBox
+                        };
                     }
                     KeyCode::Char('q') | KeyCode::Esc => {
                         ratatui::restore();
@@ -79,6 +100,15 @@ async fn main() -> Result<()> {
                 },
 
                 Focus::TorrentTable => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        ratatui::restore();
+                        return Ok(());
+                    }
+                    KeyCode::Tab => {
+                        focus = Focus::InputBox;
+                    }
+                    KeyCode::Char('j') | KeyCode::Down => transmission.table_state.select_next(),
+                    KeyCode::Char('k') | KeyCode::Up => transmission.table_state.select_previous(),
                     _ => {}
                 },
                 Focus::TorrentPopup => match key.code {
@@ -93,7 +123,12 @@ async fn main() -> Result<()> {
                         focus = Focus::MovieTable;
                     }
                     KeyCode::Enter => {
-                        todo!("download movie")
+                        if let Some(selected) = popup_torrent.popup.table_state.selected() {
+                            let torrent = &popup_torrent.torrents[selected];
+                            transmission.add(&torrent.link).await.unwrap();
+                        }
+                        popup_torrent.popup.show = false;
+                        focus = Focus::MovieTable;
                     }
                     _ => {}
                 },
@@ -108,13 +143,14 @@ fn render(
     focus: &Focus,
     input_box: &InputBox,
     popup_torrent: &PopupTorrent,
+    transmission: &mut Transmission,
 ) {
     let mut table_state = movie_table.table_state;
     let (table, constraint) = movie_table.render(focus);
 
     let area = frame.area();
-    let layout = Layout::vertical([Constraint::Length(3), constraint]);
-    let [input_box_area, movie_table_area] = area.layout(&layout);
+    let layout = Layout::vertical([Constraint::Length(3), constraint, Constraint::Length(5)]);
+    let [input_box_area, movie_table_area, torrent_table_area] = area.layout(&layout);
 
     frame.render_widget(input_box.render(focus), input_box_area);
 
@@ -132,5 +168,14 @@ fn render(
         let mut table_state = popup_torrent.popup.table_state;
         frame.render_widget(Clear, popup_area);
         frame.render_stateful_widget(popup_torrent.content(), popup_area, &mut table_state);
+    }
+
+    if transmission.is_visible() {
+        let mut table_state = transmission.table_state;
+        frame.render_stateful_widget(
+            transmission.render(focus),
+            torrent_table_area,
+            &mut table_state,
+        );
     }
 }
