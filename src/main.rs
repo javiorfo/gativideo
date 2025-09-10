@@ -27,7 +27,10 @@ async fn main() -> Result<()> {
         "/home/javier/Downloads/movies",
     );
 
-    transmission.scan().await.unwrap();
+    let mut last_redraw_time = tokio::time::Instant::now();
+    let redraw_interval = tokio::time::Duration::from_secs(2);
+
+    transmission.scan().await;
 
     loop {
         terminal.draw(|frame| {
@@ -41,7 +44,16 @@ async fn main() -> Result<()> {
             )
         })?;
 
-        if let Some(key) = event::read()?.as_key_press_event() {
+        let time_since_last_redraw = tokio::time::Instant::now().duration_since(last_redraw_time);
+        let timeout = redraw_interval.saturating_sub(time_since_last_redraw);
+        if tokio::time::Instant::now().duration_since(last_redraw_time) >= redraw_interval {
+            transmission.scan().await;
+            last_redraw_time = tokio::time::Instant::now();
+        }
+
+        if event::poll(timeout)?
+            && let Some(key) = event::read()?.as_key_press_event()
+        {
             match focus {
                 Focus::InputBox => match key.code {
                     KeyCode::Tab => {
@@ -109,6 +121,7 @@ async fn main() -> Result<()> {
                     }
                     KeyCode::Char('j') | KeyCode::Down => transmission.table_state.select_next(),
                     KeyCode::Char('k') | KeyCode::Up => transmission.table_state.select_previous(),
+                    KeyCode::Char('r') => transmission.scan().await,
                     _ => {}
                 },
                 Focus::TorrentPopup => match key.code {

@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
@@ -13,12 +15,12 @@ use crate::elements::Focus;
 pub struct Transmission {
     pub client: TransClient,
     pub table_state: TableState,
-    pub torrents: Vec<Torrent>,
+    pub torrents: Arc<Mutex<Vec<Torrent>>>,
     download_dir: String,
 }
 
 impl Transmission {
-    pub fn new(url: &str, dowload_dir: &str) -> Self {
+    pub fn new(url: &'static str, dowload_dir: &str) -> Self {
         let mut table_state = TableState::default();
         table_state.select_first();
         table_state.select_first_column();
@@ -27,12 +29,12 @@ impl Transmission {
             client: TransClient::new(url.parse().expect("Could not parse transmission url")),
             table_state,
             download_dir: dowload_dir.to_string(),
-            torrents: vec![],
+            torrents: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     pub fn is_visible(&self) -> bool {
-        !self.torrents.is_empty()
+        !self.torrents.lock().unwrap().is_empty()
     }
 
     pub async fn add(&mut self, torrent_url: &str) -> transmission_rpc::types::Result<bool> {
@@ -43,12 +45,11 @@ impl Transmission {
         };
         let res: RpcResponse<TorrentAddedOrDuplicate> = self.client.torrent_add(add).await?;
 
-        self.scan().await.unwrap();
-
         Ok(res.is_ok())
     }
 
-    pub async fn scan(&mut self) -> transmission_rpc::types::Result<()> {
+    pub async fn scan(&mut self) {
+        let torrents_ref = self.torrents.clone();
         let torrents = self
             .client
             .torrent_get(
@@ -58,17 +59,16 @@ impl Transmission {
                     TorrentGetField::SizeWhenDone,
                     TorrentGetField::PeersSendingToUs,
                     TorrentGetField::PeersConnected,
-                    TorrentGetField::IsFinished,
                     TorrentGetField::IsStalled,
                 ]),
                 None,
             )
-            .await?;
+            .await
+            .unwrap();
 
-        //         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-        self.torrents = torrents.arguments.torrents;
-        Ok(())
+        let mut torrents_mut = torrents_ref.lock().unwrap();
+        torrents_mut.clear();
+        *torrents_mut = torrents.arguments.torrents;
     }
 
     pub fn render(&mut self, focus: &Focus) -> Table<'_> {
@@ -86,10 +86,11 @@ impl Transmission {
 
         let mut rows: Vec<Vec<String>> = Vec::new();
 
-        for torrent in &self.torrents {
+        let torrents = self.torrents.clone();
+        for torrent in torrents.lock().unwrap().iter() {
             let status = if *torrent.is_stalled.as_ref().unwrap() {
                 String::from("  Stalled")
-            } else if *torrent.is_finished.as_ref().unwrap() {
+            } else if *torrent.percent_done.as_ref().unwrap() == 1.0 {
                 String::from("󰸞  Finished")
             } else {
                 String::from("  Downloading")
@@ -98,14 +99,14 @@ impl Transmission {
             rows.push(vec![
                 torrent.name.as_ref().unwrap().clone(),
                 format!(
-                    "{:.2}%",
+                    "{:.2}GB",
                     torrent
                         .size_when_done
                         .as_ref()
                         .map_or(0.0, |&p| p as f64 / 1024.0 / 1024.0 / 1024.0)
                 ),
                 format!(
-                    "{:.2}GB",
+                    "{:.2}%",
                     torrent.percent_done.as_ref().map_or(0.0, |p| p * 100.0)
                 ),
                 status,
