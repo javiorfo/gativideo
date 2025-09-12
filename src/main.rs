@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     );
 
     let mut last_redraw_time = tokio::time::Instant::now();
-    let redraw_interval = tokio::time::Duration::from_secs(2);
+    let redraw_interval = tokio::time::Duration::from_secs(1);
 
     transmission.scan().await;
 
@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
                         movie_table.next_page(&input_box.text).await.expect("");
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
-                        movie_table.table_state.select_previous_column()
+                        movie_table.previous_page(&input_box.text).await.expect("");
                     }
                     KeyCode::Char('g') => movie_table.table_state.select_first(),
                     KeyCode::Char('G') => movie_table.table_state.select_last(),
@@ -112,6 +112,13 @@ async fn main() -> Result<()> {
                 },
 
                 Focus::TorrentTable => match key.code {
+                    KeyCode::Char('s') => {
+                        if let Some(selected) = transmission.table_state.selected()
+                            && !transmission.torrents.is_empty()
+                        {
+                            transmission.toggle(selected).await.unwrap();
+                        }
+                    }
                     KeyCode::Char('q') | KeyCode::Esc => {
                         ratatui::restore();
                         return Ok(());
@@ -121,7 +128,13 @@ async fn main() -> Result<()> {
                     }
                     KeyCode::Char('j') | KeyCode::Down => transmission.table_state.select_next(),
                     KeyCode::Char('k') | KeyCode::Up => transmission.table_state.select_previous(),
-                    KeyCode::Char('r') => transmission.scan().await,
+                    KeyCode::Char('d') => {
+                        if let Some(selected) = transmission.table_state.selected()
+                            && !transmission.torrents.is_empty()
+                        {
+                            transmission.remove(selected).await.unwrap();
+                        }
+                    }
                     _ => {}
                 },
                 Focus::TorrentPopup => match key.code {
@@ -158,11 +171,15 @@ fn render(
     popup_torrent: &PopupTorrent,
     transmission: &mut Transmission,
 ) {
-    let mut table_state = movie_table.table_state;
+    let mut movie_table_state = movie_table.table_state;
     let (table, constraint) = movie_table.render(focus);
 
+    let visible = transmission.is_visible();
+    let mut transmission_table_state = transmission.table_state;
+    let (torrent_table, torrent_constraint) = transmission.render(focus);
+
     let area = frame.area();
-    let layout = Layout::vertical([Constraint::Length(3), constraint, Constraint::Length(5)]);
+    let layout = Layout::vertical([Constraint::Length(3), constraint, torrent_constraint]);
     let [input_box_area, movie_table_area, torrent_table_area] = area.layout(&layout);
 
     frame.render_widget(input_box.render(focus), input_box_area);
@@ -174,7 +191,7 @@ fn render(
         ));
     }
 
-    frame.render_stateful_widget(table, movie_table_area, &mut table_state);
+    frame.render_stateful_widget(table, movie_table_area, &mut movie_table_state);
 
     if popup_torrent.popup.show {
         let popup_area = popup_torrent.area(movie_table_area);
@@ -183,12 +200,11 @@ fn render(
         frame.render_stateful_widget(popup_torrent.content(), popup_area, &mut table_state);
     }
 
-    if transmission.is_visible() {
-        let mut table_state = transmission.table_state;
+    if visible {
         frame.render_stateful_widget(
-            transmission.render(focus),
+            torrent_table,
             torrent_table_area,
-            &mut table_state,
+            &mut transmission_table_state,
         );
     }
 }

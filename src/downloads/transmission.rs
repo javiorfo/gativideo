@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
@@ -7,7 +5,10 @@ use ratatui::{
 };
 use transmission_rpc::{
     TransClient,
-    types::{RpcResponse, Torrent, TorrentAddArgs, TorrentAddedOrDuplicate, TorrentGetField},
+    types::{
+        Nothing, RpcResponse, Torrent, TorrentAction, TorrentAddArgs, TorrentAddedOrDuplicate,
+        TorrentGetField, TorrentStatus,
+    },
 };
 
 use crate::elements::Focus;
@@ -15,7 +16,7 @@ use crate::elements::Focus;
 pub struct Transmission {
     pub client: TransClient,
     pub table_state: TableState,
-    pub torrents: Arc<Mutex<Vec<Torrent>>>,
+    pub torrents: Vec<Torrent>,
     download_dir: String,
 }
 
@@ -29,12 +30,12 @@ impl Transmission {
             client: TransClient::new(url.parse().expect("Could not parse transmission url")),
             table_state,
             download_dir: dowload_dir.to_string(),
-            torrents: Arc::new(Mutex::new(Vec::new())),
+            torrents: Vec::new(),
         }
     }
 
     pub fn is_visible(&self) -> bool {
-        !self.torrents.lock().unwrap().is_empty()
+        !self.torrents.is_empty()
     }
 
     pub async fn add(&mut self, torrent_url: &str) -> transmission_rpc::types::Result<bool> {
@@ -45,33 +46,60 @@ impl Transmission {
         };
         let res: RpcResponse<TorrentAddedOrDuplicate> = self.client.torrent_add(add).await?;
 
+        self.scan().await;
+
+        Ok(res.is_ok())
+    }
+
+    pub async fn toggle(&mut self, index: usize) -> transmission_rpc::types::Result<bool> {
+        let torrent = &self.torrents[index];
+        let torrent_action = if matches!(torrent.status.as_ref().unwrap(), TorrentStatus::Stopped) {
+            TorrentAction::Start
+        } else {
+            TorrentAction::Stop
+        };
+
+        let id = torrent.id().as_ref().unwrap().clone();
+
+        let res: RpcResponse<Nothing> =
+            self.client.torrent_action(torrent_action, vec![id]).await?;
+
+        Ok(res.is_ok())
+    }
+
+    pub async fn remove(&mut self, index: usize) -> transmission_rpc::types::Result<bool> {
+        let torrent = &self.torrents[index];
+        let id = torrent.id().as_ref().unwrap().clone();
+
+        let res: RpcResponse<Nothing> = self.client.torrent_remove(vec![id], false).await?;
+
         Ok(res.is_ok())
     }
 
     pub async fn scan(&mut self) {
-        let torrents_ref = self.torrents.clone();
         let torrents = self
             .client
             .torrent_get(
                 Some(vec![
+                    TorrentGetField::Id,
                     TorrentGetField::Name,
                     TorrentGetField::PercentDone,
                     TorrentGetField::SizeWhenDone,
                     TorrentGetField::PeersSendingToUs,
                     TorrentGetField::PeersConnected,
                     TorrentGetField::IsStalled,
+                    TorrentGetField::Status,
                 ]),
                 None,
             )
             .await
             .unwrap();
 
-        let mut torrents_mut = torrents_ref.lock().unwrap();
-        torrents_mut.clear();
-        *torrents_mut = torrents.arguments.torrents;
+        self.torrents.clear();
+        self.torrents = torrents.arguments.torrents;
     }
 
-    pub fn render(&mut self, focus: &Focus) -> Table<'_> {
+    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, Constraint) {
         let widths = [
             Constraint::Percentage(30),
             Constraint::Percentage(10),
@@ -86,8 +114,7 @@ impl Transmission {
 
         let mut rows: Vec<Vec<String>> = Vec::new();
 
-        let torrents = self.torrents.clone();
-        for torrent in torrents.lock().unwrap().iter() {
+        for torrent in &self.torrents {
             let status = if *torrent.is_stalled.as_ref().unwrap() {
                 String::from("  Stalled")
             } else if *torrent.percent_done.as_ref().unwrap() == 1.0 {
@@ -123,6 +150,12 @@ impl Transmission {
             .map(|item| Row::new(item.iter().cloned()))
             .collect::<Vec<_>>();
 
+        let constraint = if rows.len() < 6 {
+            Constraint::Length(rows.len() as u16 + 4)
+        } else {
+            Constraint::Length(10)
+        };
+
         let border_style = if matches!(focus, Focus::TorrentTable) {
             Style::default()
                 .fg(Color::Cyan)
@@ -131,33 +164,36 @@ impl Transmission {
             Style::default().fg(Color::DarkGray)
         };
 
-        Table::new(rows, widths)
-            .header(header)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Thick)
-                    .border_style(border_style)
-                    .title(" Downloads ")
-                    .title_style(Style::new().white().bold())
-                    .title_alignment(ratatui::layout::Alignment::Center),
-            )
-            .column_spacing(1)
-            .style(Style::default().fg(Color::White))
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .column_highlight_style(Color::Gray)
-            .cell_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol(" ")
+        (
+            Table::new(rows, widths)
+                .header(header)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Thick)
+                        .border_style(border_style)
+                        .title(" Downloads ")
+                        .title_style(Style::new().white().bold())
+                        .title_alignment(ratatui::layout::Alignment::Center),
+                )
+                .column_spacing(1)
+                .style(Style::default().fg(Color::White))
+                .row_highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .column_highlight_style(Color::Gray)
+                .cell_highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(" "),
+            constraint,
+        )
     }
 }

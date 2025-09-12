@@ -74,6 +74,19 @@ impl MovieTable {
         Ok(())
     }
 
+    pub async fn previous_page(&mut self, text: &str) -> yts_movies::Result {
+        let response = &self.response;
+        let prev_page = response.page.current - 1;
+        if prev_page > 0 {
+            self.response = self
+                .yts
+                .search_with_filter(text, Filters::default().page(prev_page).build())
+                .await?;
+        }
+
+        Ok(())
+    }
+
     fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
