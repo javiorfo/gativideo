@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Row, ScrollbarState, Table, TableState},
 };
 use transmission_rpc::{
     TransClient,
@@ -17,11 +17,12 @@ pub struct Transmission {
     pub client: TransClient,
     pub table_state: TableState,
     pub torrents: Vec<Torrent>,
+    pub scroll_state: ScrollbarState,
     download_dir: String,
 }
 
 impl Transmission {
-    pub fn new(url: &'static str, dowload_dir: &str) -> Self {
+    pub fn new(url: String, download_dir: String) -> Self {
         let mut table_state = TableState::default();
         table_state.select_first();
         table_state.select_first_column();
@@ -29,7 +30,8 @@ impl Transmission {
         Self {
             client: TransClient::new(url.parse().expect("Could not parse transmission url")),
             table_state,
-            download_dir: dowload_dir.to_string(),
+            download_dir,
+            scroll_state: ScrollbarState::default().position(1),
             torrents: Vec::new(),
         }
     }
@@ -97,6 +99,20 @@ impl Transmission {
 
         self.torrents.clear();
         self.torrents = torrents.arguments.torrents;
+    }
+
+    pub fn scroll_bar_up(&mut self) {
+        let position = self.scroll_state.get_position();
+        if position > 1 {
+            self.scroll_state = self.scroll_state.position(position.saturating_sub(1));
+        }
+    }
+
+    pub fn scroll_bar_down(&mut self) {
+        let position = self.scroll_state.get_position();
+        if position < self.torrents.len() - 1 {
+            self.scroll_state = self.scroll_state.position(position.saturating_add(1));
+        }
     }
 
     pub fn render(&mut self, focus: &Focus) -> (Table<'_>, Constraint) {

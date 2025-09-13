@@ -1,12 +1,13 @@
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Row, ScrollbarState, Table, TableState},
 };
 use yts_movies::{Movie, Torrent, Yts};
 
 pub struct Popup<'a> {
     pub table_state: TableState,
+    pub scroll_state: ScrollbarState,
     pub show: bool,
     title: &'a str,
     footer: &'a str,
@@ -22,6 +23,7 @@ impl<'a> Popup<'a> {
             title,
             footer,
             table_state,
+            scroll_state: ScrollbarState::default().position(1),
             show: false,
         }
     }
@@ -32,6 +34,20 @@ impl<'a> Popup<'a> {
         let [area] = area.layout(&vertical);
         let [area] = area.layout(&horizontal);
         area
+    }
+
+    pub fn scroll_bar_up(&mut self) {
+        let position = self.scroll_state.get_position();
+        if position > 1 {
+            self.scroll_state = self.scroll_state.position(position.saturating_sub(1));
+        }
+    }
+
+    pub fn scroll_bar_down(&mut self, len: usize) {
+        let position = self.scroll_state.get_position();
+        if position < len - 1 {
+            self.scroll_state = self.scroll_state.position(position.saturating_add(1));
+        }
     }
 }
 
