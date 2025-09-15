@@ -168,6 +168,8 @@ impl<'a> PopupSubtitle<'a> {
     }
 
     pub async fn search_subtitles(&mut self, movie: &Movie) -> opensubs::Result {
+        let name = &movie.name;
+        let year = movie.year;
         let results = opensubs::search(SearchBy::MovieAndFilter(
             &movie.name,
             Filters::default()
@@ -180,9 +182,10 @@ impl<'a> PopupSubtitle<'a> {
 
         match results {
             Response::Movie(movies) => {
-                if let Some(movie) = movies.first()
-                    && let Response::Subtitle(page, subtitles) =
-                        opensubs::search(SearchBy::Url(&movie.subtitles_link)).await?
+                if let Some(movie) = movies.iter().find(|&movie| {
+                    movie.name.to_lowercase() == format!("{} ({})", name.to_lowercase(), year)
+                }) && let Response::Subtitle(page, subtitles) =
+                    opensubs::search(SearchBy::Url(&movie.subtitles_link)).await?
                 {
                     self.subtitles = subtitles;
                     self.page = page;

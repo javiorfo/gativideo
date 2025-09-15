@@ -2,16 +2,21 @@
 name = "gativideo"
 version = "0.1.0"
 edition = "2024"
+description = "TUI app to download YTS movies and opensubtitles subtitles"
+authors = ["Javier Orfo <javierorfo@protonmail.com>"]
+license = "MIT"
+repository = "https://github.com/javiorfo/gativideo"
+homepage = "https://github.com/javiorfo/gativideo#readme"
+keywords = ["movies", "subtitles", "yts", "tui"]
 
 [dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
+ratatui = { version = "0.30.0-alpha.5", features = ["all-widgets"] }
+serde = { version = "1.0.219", features = ["derive"] }
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
-ratatui = { version = "0.30.0-alpha.5", features = ["all-widgets"] }
-# opensubs = "0.1.2"
-opensubs = { path = "/home/javier/dev/rust/opensubs" }
 transmission-rpc = "0.5.0"
-yts-movies = "0.2.0"
 anyhow = "1.0.99"
 toml = "0.9.5"
-serde = { version = "1.0.219", features = ["derive"] }
+opensubs = "0.1.3"
+yts-movies = "0.2.0"

@@ -1490,6 +1490,8 @@ dependencies = [
 [[package]]
 name = "opensubs"
 version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b7b7a6f7281d747a91432e865989b8143ab549aa00482c6bcacaca54faf48ee"
 dependencies = [
  "regex",
  "reqwest",
