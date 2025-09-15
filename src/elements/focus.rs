@@ -4,5 +4,6 @@ pub enum Focus {
     InputBox,
     MovieTable,
     TorrentTable,
-    TorrentPopup,
+    PopupTorrent,
+    PopupSubtitle,
 }

@@ -1,5 +1,6 @@
 use std::{env, fs};
 
+use opensubs::Language;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -25,7 +26,8 @@ struct Yts {
 
 #[derive(Deserialize, Debug)]
 struct Opensubs {
-    pub language: Option<String>,
+    pub languages: Vec<String>,
+    pub order: Option<String>,
 }
 
 #[derive(Debug)]
@@ -33,7 +35,8 @@ pub struct Config {
     pub yts_host: String,
     pub yts_download_dir: String,
     pub yts_order: yts_movies::OrderBy,
-    pub opensubs_lang: String,
+    pub opensubs_langs: Vec<Language>,
+    pub opensubs_order: opensubs::OrderBy,
     pub transmission_host: String,
     pub transmission_username: Option<String>,
     pub transmission_password: Option<String>,
@@ -56,10 +59,25 @@ impl From<ConfigToml> for Config {
             }
         }
 
-        if let Some(opensubs) = value.opensubs
-            && let Some(language) = opensubs.language
-        {
-            config.opensubs_lang = language;
+        if let Some(opensubs) = value.opensubs {
+            config.opensubs_langs = opensubs
+                .languages
+                .iter()
+                .map(|lang| {
+                    opensubs::Language::try_from(lang.as_str()).unwrap_or_else(|_| {
+                        panic!("Failed to convert '{lang}' to Opensubs Language")
+                    })
+                })
+                .collect();
+
+            if let Some(order) = opensubs.order {
+                config.opensubs_order = match order.to_lowercase().as_str() {
+                    "downloads" => opensubs::OrderBy::Downloads,
+                    "rating" => opensubs::OrderBy::Rating,
+                    "uploaded" => opensubs::OrderBy::Uploaded,
+                    _ => panic!("Failed to convert '{order}' to Opensubs Order"),
+                }
+            }
         }
 
         if let Some(transmission) = value.transmission {
@@ -86,7 +104,8 @@ impl Default for Config {
                     .expect("Error converting HOME var to string")
             ),
             yts_order: yts_movies::OrderBy::Rating,
-            opensubs_lang: "es".to_string(),
+            opensubs_langs: vec![Language::Spanish],
+            opensubs_order: opensubs::OrderBy::Downloads,
             transmission_host: "http://127.0.0.1:9091/transmission/rpc".to_string(),
             transmission_username: None,
             transmission_password: None,

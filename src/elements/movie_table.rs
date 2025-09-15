@@ -50,7 +50,7 @@ impl<'a> MovieTable<'a> {
                 page.total, page.current, page.of
             )
         } else {
-            String::from(" 0 Movie/s - Page 0/0 ")
+            String::from(" 0 Movie/s ")
         }
     }
 
@@ -208,16 +208,13 @@ impl<'a> MovieTable<'a> {
             .collect::<Vec<_>>()
     }
 
-    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, Constraint) {
+    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, u16) {
         let rows = self.response_to_rows();
 
         let (header, constraint) = if !rows.is_empty() {
-            (
-                ["Year", "Name", "Genre", "Rating"],
-                Constraint::Length(rows.len() as u16 + 4),
-            )
+            (["Year", "Name", "Genre", "Rating"], rows.len() as u16 + 4)
         } else {
-            (["", "", "", ""], Constraint::Length(2))
+            (["", "", "", ""], 2)
         };
 
         let header = Row::new(header)

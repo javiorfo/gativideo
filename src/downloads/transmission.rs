@@ -128,7 +128,7 @@ impl Transmission {
         }
     }
 
-    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, Constraint) {
+    pub fn render(&mut self, focus: &Focus) -> (Table<'_>, u16) {
         let widths = [
             Constraint::Percentage(30),
             Constraint::Percentage(10),
@@ -180,9 +180,9 @@ impl Transmission {
             .collect::<Vec<_>>();
 
         let constraint = if rows.len() < 6 {
-            Constraint::Length(rows.len() as u16 + 4)
+            rows.len() as u16 + 4
         } else {
-            Constraint::Length(10)
+            10
         };
 
         let border_style = if matches!(focus, Focus::TorrentTable) {

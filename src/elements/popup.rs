@@ -1,3 +1,4 @@
+use opensubs::{Filters, Language, OrderBy, Page, Response, SearchBy, Subtitle};
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -10,18 +11,16 @@ pub struct Popup<'a> {
     pub scroll_state: ScrollbarState,
     pub show: bool,
     title: &'a str,
-    footer: &'a str,
 }
 
 impl<'a> Popup<'a> {
-    pub fn new(title: &'a str, footer: &'a str) -> Popup<'a> {
+    pub fn new(title: &'a str) -> Popup<'a> {
         let mut table_state = TableState::default();
         table_state.select_first();
         table_state.select_first_column();
 
         Self {
             title,
-            footer,
             table_state,
             scroll_state: ScrollbarState::default().position(1),
             show: false,
@@ -45,7 +44,7 @@ impl<'a> Popup<'a> {
 
     pub fn scroll_bar_down(&mut self, len: usize) {
         let position = self.scroll_state.get_position();
-        if position < len - 1 {
+        if len > 0 && position < len - 1 {
             self.scroll_state = self.scroll_state.position(position.saturating_add(1));
         }
     }
@@ -58,9 +57,9 @@ pub struct PopupTorrent<'a> {
 }
 
 impl<'a> PopupTorrent<'a> {
-    pub fn new(title: &'a str, footer: &'a str) -> PopupTorrent<'a> {
+    pub fn new() -> PopupTorrent<'a> {
         Self {
-            popup: Popup::new(title, footer),
+            popup: Popup::new(" Torrents "),
             yts: Yts::default(),
             torrents: vec![],
         }
@@ -75,7 +74,7 @@ impl<'a> PopupTorrent<'a> {
         Ok(())
     }
 
-    pub fn content(&self) -> Table<'a> {
+    pub fn render(&self) -> Table<'a> {
         let widths = [
             Constraint::Percentage(15),
             Constraint::Percentage(15),
@@ -108,6 +107,8 @@ impl<'a> PopupTorrent<'a> {
             .map(|item| Row::new(item.iter().cloned()))
             .collect::<Vec<_>>();
 
+        let footer = format!(" {} file/s ", rows.len());
+
         Table::new(rows, widths)
             .header(header)
             .block(
@@ -117,7 +118,7 @@ impl<'a> PopupTorrent<'a> {
                     .title(self.popup.title)
                     .title_style(Style::new().white().bold())
                     .title_alignment(ratatui::layout::Alignment::Center)
-                    .title_bottom(self.popup.footer),
+                    .title_bottom(footer),
             )
             .column_spacing(1)
             .style(Style::default().fg(Color::White))
@@ -135,5 +136,171 @@ impl<'a> PopupTorrent<'a> {
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(" ")
+    }
+}
+
+pub struct PopupSubtitle<'a> {
+    pub popup: Popup<'a>,
+    pub subtitles: Vec<Subtitle>,
+    pub page: Page,
+    languages: &'a [Language],
+    order: OrderBy,
+}
+
+impl<'a> PopupSubtitle<'a> {
+    pub fn new(languages: &'a [Language], order: OrderBy) -> PopupSubtitle<'a> {
+        Self {
+            popup: Popup::new(" Subtitles "),
+            languages,
+            order,
+            subtitles: vec![],
+            page: Page {
+                from: 0,
+                to: 0,
+                total: 0,
+            },
+        }
+    }
+
+    pub fn area(&self, area: Rect, y: u16) -> Rect {
+        let y = y.min(self.subtitles.len() as u16) + 4;
+        self.popup.centered_area(area, 80, y)
+    }
+
+    pub async fn search_subtitles(&mut self, movie: &Movie) -> opensubs::Result {
+        let results = opensubs::search(SearchBy::MovieAndFilter(
+            &movie.name,
+            Filters::default()
+                .year(movie.year)
+                .languages(self.languages)
+                .order_by(self.order.clone())
+                .build(),
+        ))
+        .await?;
+
+        match results {
+            Response::Movie(movies) => {
+                if let Some(movie) = movies.first()
+                    && let Response::Subtitle(page, subtitles) =
+                        opensubs::search(SearchBy::Url(&movie.subtitles_link)).await?
+                {
+                    self.subtitles = subtitles;
+                    self.page = page;
+                }
+            }
+            Response::Subtitle(page, subtitles) => {
+                self.subtitles = subtitles;
+                self.page = page;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn render(&self) -> Table<'a> {
+        let widths = [
+            Constraint::Percentage(5),
+            Constraint::Percentage(30),
+            Constraint::Percentage(20),
+            Constraint::Percentage(10),
+            Constraint::Percentage(15),
+            Constraint::Percentage(10),
+            Constraint::Percentage(10),
+        ];
+
+        let header = Row::new([
+            "#",
+            "Movie",
+            "Language",
+            "CD",
+            "Uploaded",
+            "Downloads",
+            "Rating",
+        ])
+        .style(Style::new().dark_gray().bold())
+        .bottom_margin(0);
+
+        let mut rows: Vec<Vec<String>> = Vec::new();
+
+        for (i, sub) in self.subtitles.iter().enumerate() {
+            rows.push(vec![
+                (i + 1).to_string(),
+                sub.movie.clone(),
+                sub.language.clone(),
+                sub.cd.clone(),
+                sub.uploaded.clone(),
+                sub.downloads.to_string(),
+                sub.rating.to_string(),
+            ]);
+        }
+
+        let rows = rows
+            .iter()
+            .map(|item| Row::new(item.iter().cloned()))
+            .collect::<Vec<_>>();
+
+        Table::new(rows, widths)
+            .header(header)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain)
+                    .title(self.popup.title)
+                    .title_style(Style::new().white().bold())
+                    .title_alignment(ratatui::layout::Alignment::Center)
+                    .title_bottom(self.footer()),
+            )
+            .column_spacing(1)
+            .style(Style::default().fg(Color::White))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .column_highlight_style(Color::Gray)
+            .cell_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(" ")
+    }
+
+    pub fn footer(&self) -> String {
+        let page = &self.page;
+        if page.total != 0 {
+            format!(
+                " {} file/s - From {} to {} ",
+                page.total, page.from, page.to
+            )
+        } else {
+            String::from(" 0 file/s ")
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use opensubs::Language;
+
+    use crate::elements::PopupSubtitle;
+
+    #[tokio::test]
+    async fn search_subtitles() {
+        let mut popup_subtitle =
+            PopupSubtitle::new(&[Language::Spanish], opensubs::OrderBy::Rating);
+
+        let response = yts_movies::Yts::default()
+            .search("Holdovers")
+            .await
+            .unwrap();
+
+        let movie = response.movies.first().unwrap();
+
+        popup_subtitle.search_subtitles(movie).await.unwrap();
+
+        assert!(!popup_subtitle.subtitles.is_empty());
     }
 }

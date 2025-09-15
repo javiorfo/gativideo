@@ -6,7 +6,7 @@ use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use crate::config::configuration;
 use crate::downloads::Transmission;
-use crate::elements::{Focus, InputBox, MovieTable, PopupTorrent};
+use crate::elements::{Focus, InputBox, MovieTable, PopupSubtitle, PopupTorrent};
 
 pub async fn run() -> anyhow::Result<()> {
     let config = configuration()?;
@@ -18,7 +18,8 @@ pub async fn run() -> anyhow::Result<()> {
     let mut focus = Focus::default();
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::new(&config.yts_host, config.yts_order);
-    let mut popup_torrent = PopupTorrent::new(" Torrents ", " Enter to download ");
+    let mut popup_torrent = PopupTorrent::new();
+    let mut popup_subtitle = PopupSubtitle::new(&config.opensubs_langs, config.opensubs_order);
     let mut transmission = Transmission::new(
         config.transmission_host,
         config.transmission_username,
@@ -39,6 +40,7 @@ pub async fn run() -> anyhow::Result<()> {
                 &focus,
                 &input_box,
                 &popup_torrent,
+                &popup_subtitle,
                 &mut transmission,
             )
         })?;
@@ -113,12 +115,24 @@ pub async fn run() -> anyhow::Result<()> {
                             }
 
                             popup_torrent.popup.show = true;
-                            focus = Focus::TorrentPopup;
+                            focus = Focus::PopupTorrent;
+                        }
+                    }
+                    KeyCode::Char('s') => {
+                        if let Some(selected) = movie_table.table_state.selected()
+                            && !movie_table.response.movies.is_empty()
+                        {
+                            let movie = &movie_table.response.movies[selected];
+                            if let Err(e) = popup_subtitle.search_subtitles(movie).await {
+                                panic!("Error searching subtitles {e}");
+                            }
+
+                            popup_subtitle.popup.show = true;
+                            focus = Focus::PopupSubtitle;
                         }
                     }
                     _ => {}
                 },
-
                 Focus::TorrentTable => match key.code {
                     KeyCode::Char('s') => {
                         if let Some(selected) = transmission.table_state.selected()
@@ -157,7 +171,7 @@ pub async fn run() -> anyhow::Result<()> {
                     }
                     _ => {}
                 },
-                Focus::TorrentPopup => match key.code {
+                Focus::PopupTorrent => match key.code {
                     KeyCode::Char('j') | KeyCode::Down => {
                         popup_torrent.popup.table_state.select_next();
                         popup_torrent
@@ -181,8 +195,26 @@ pub async fn run() -> anyhow::Result<()> {
                                 .map_err(anyhow::Error::msg)?;
                         }
                         popup_torrent.popup.show = false;
+                        focus = Focus::TorrentTable;
+                    }
+                    _ => {}
+                },
+                Focus::PopupSubtitle => match key.code {
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        popup_subtitle.popup.table_state.select_next();
+                        popup_subtitle
+                            .popup
+                            .scroll_bar_down(popup_subtitle.subtitles.len());
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        popup_subtitle.popup.table_state.select_previous();
+                        popup_subtitle.popup.scroll_bar_up();
+                    }
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        popup_subtitle.popup.show = false;
                         focus = Focus::MovieTable;
                     }
+                    KeyCode::Enter => {}
                     _ => {}
                 },
             }
@@ -196,6 +228,7 @@ fn render(
     focus: &Focus,
     input_box: &InputBox,
     popup_torrent: &PopupTorrent,
+    popup_subtitle: &PopupSubtitle,
     transmission: &mut Transmission,
 ) {
     let mut movie_table_state = movie_table.table_state;
@@ -206,7 +239,12 @@ fn render(
     let (torrent_table, torrent_constraint) = transmission.render(focus);
 
     let area = frame.area();
-    let layout = Layout::vertical([Constraint::Length(3), constraint, torrent_constraint]);
+    let layout = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(constraint),
+        Constraint::Length(torrent_constraint),
+    ]);
+
     let [input_box_area, movie_table_area, torrent_table_area] = area.layout(&layout);
 
     frame.render_widget(input_box.render(focus), input_box_area);
@@ -224,12 +262,34 @@ fn render(
         let popup_area = popup_torrent.area(movie_table_area);
         let mut table_state = popup_torrent.popup.table_state;
         frame.render_widget(Clear, popup_area);
-        frame.render_stateful_widget(popup_torrent.content(), popup_area, &mut table_state);
+        frame.render_stateful_widget(popup_torrent.render(), popup_area, &mut table_state);
 
         let mut scroll_state = popup_torrent
             .popup
             .scroll_state
             .content_length(popup_torrent.torrents.len() + 2);
+
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .symbols(scrollbar::VERTICAL)
+                .begin_symbol(None)
+                .track_symbol(None)
+                .end_symbol(None),
+            popup_area,
+            &mut scroll_state,
+        );
+    }
+
+    if popup_subtitle.popup.show {
+        let popup_area = popup_subtitle.area(movie_table_area, constraint);
+        let mut table_state = popup_subtitle.popup.table_state;
+        frame.render_widget(Clear, popup_area);
+        frame.render_stateful_widget(popup_subtitle.render(), popup_area, &mut table_state);
+
+        let mut scroll_state = popup_subtitle
+            .popup
+            .scroll_state
+            .content_length(popup_subtitle.subtitles.len() + 2);
 
         frame.render_stateful_widget(
             Scrollbar::new(ScrollbarOrientation::VerticalRight)
