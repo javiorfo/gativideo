@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
@@ -8,20 +10,27 @@ use yts_movies::{Filters, Page, Response, Yts};
 use crate::elements::Focus;
 
 #[derive(Debug)]
-pub struct MovieTable {
+pub struct MovieTable<'a> {
     pub table_state: TableState,
     pub response: Response,
-    yts: Yts<'static>,
+    default_order: yts_movies::OrderBy,
+    yts: Yts<'a>,
 }
 
-impl Default for MovieTable {
-    fn default() -> Self {
+impl<'a> MovieTable<'a> {
+    const TITLE: &'static str = " YTS MOVIES ";
+
+    pub fn new(host: &'a str, default_order: yts_movies::OrderBy) -> Self {
         let mut table_state = TableState::default();
         table_state.select_first();
         table_state.select_first_column();
 
+        let yts = Yts::new(host, Duration::from_secs(30));
+
         Self {
             table_state,
+            yts,
+            default_order,
             response: Response {
                 page: Page {
                     current: 0,
@@ -30,13 +39,8 @@ impl Default for MovieTable {
                 },
                 movies: vec![],
             },
-            yts: Yts::default(),
         }
     }
-}
-
-impl MovieTable {
-    const TITLE: &'static str = " YTS MOVIES ";
 
     pub fn footer(&self) -> String {
         let page = &self.response.page;
@@ -53,7 +57,14 @@ impl MovieTable {
     pub async fn search(&mut self, text: &str) -> yts_movies::Result {
         let response = self
             .yts
-            .search_with_filter(text, Filters::default().build())
+            .search_with_filter(
+                self.clean_search_text(text),
+                Filters::default()
+                    .year(self.year_filter(text))
+                    .rating(self.rating_filter(text))
+                    .order_by(self.order_filter(text))
+                    .build(),
+            )
             .await?;
 
         self.response = response;
@@ -67,7 +78,15 @@ impl MovieTable {
         if next_page <= response.page.of {
             self.response = self
                 .yts
-                .search_with_filter(text, Filters::default().page(next_page).build())
+                .search_with_filter(
+                    self.clean_search_text(text),
+                    Filters::default()
+                        .year(self.year_filter(text))
+                        .rating(self.rating_filter(text))
+                        .order_by(self.order_filter(text))
+                        .page(next_page)
+                        .build(),
+                )
                 .await?;
         }
 
@@ -80,14 +99,88 @@ impl MovieTable {
         if prev_page > 0 {
             self.response = self
                 .yts
-                .search_with_filter(text, Filters::default().page(prev_page).build())
+                .search_with_filter(
+                    self.clean_search_text(text),
+                    Filters::default()
+                        .year(self.year_filter(text))
+                        .rating(self.rating_filter(text))
+                        .order_by(self.order_filter(text))
+                        .page(prev_page)
+                        .build(),
+                )
                 .await?;
         }
 
         Ok(())
     }
 
-    fn response_to_rows<'a>(&self) -> Vec<Row<'a>> {
+    fn clean_search_text(&self, text: &'a str) -> &'a str {
+        let indices: Vec<Option<usize>> = vec![
+            text.find(" year:"),
+            text.find(" rating:"),
+            text.find(" order:"),
+        ];
+
+        let min_index = indices.iter().filter_map(|&x| x).min();
+
+        match min_index {
+            Some(index) => &text[..index],
+            None => text,
+        }
+    }
+
+    fn year_filter(&self, text: &'a str) -> yts_movies::Year {
+        match Self::filter_value(text, " year:") {
+            Some(year) => match year.parse::<u32>() {
+                Ok(n) => yts_movies::Year::Equal(n),
+                _ => yts_movies::Year::All,
+            },
+            _ => yts_movies::Year::All,
+        }
+    }
+
+    fn order_filter(&self, text: &'a str) -> yts_movies::OrderBy {
+        match Self::filter_value(text, " order:") {
+            Some(o) => {
+                let order: Result<yts_movies::OrderBy, _> = o.try_into();
+                order.unwrap_or(self.default_order.clone())
+            }
+            _ => self.default_order.clone(),
+        }
+    }
+
+    fn rating_filter(&self, text: &'a str) -> yts_movies::Rating {
+        match Self::filter_value(text, " rating:") {
+            Some(rating) => match rating {
+                "1" => yts_movies::Rating::One,
+                "2" => yts_movies::Rating::Two,
+                "3" => yts_movies::Rating::Three,
+                "4" => yts_movies::Rating::Four,
+                "5" => yts_movies::Rating::Five,
+                "6" => yts_movies::Rating::Six,
+                "7" => yts_movies::Rating::Seven,
+                "8" => yts_movies::Rating::Eight,
+                "9" => yts_movies::Rating::Nine,
+                _ => yts_movies::Rating::All,
+            },
+            _ => yts_movies::Rating::All,
+        }
+    }
+
+    fn filter_value(text: &'a str, filter: &'a str) -> Option<&'a str> {
+        match text.split_once(filter) {
+            Some((_, rest)) => {
+                if let Some((year_str, _)) = rest.split_once(' ') {
+                    Some(year_str)
+                } else {
+                    Some(rest)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn response_to_rows(&self) -> Vec<Row<'a>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
         if self.response.page.total == 0 {
@@ -140,7 +233,7 @@ impl MovieTable {
 
         let border_style = if matches!(focus, Focus::MovieTable) {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Gray)
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)

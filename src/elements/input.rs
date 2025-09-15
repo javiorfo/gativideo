@@ -14,7 +14,7 @@ impl InputBox {
     pub fn render(&self, focus: &Focus) -> Paragraph<'_> {
         let style = if matches!(focus, Focus::InputBox) {
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Gray)
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
@@ -27,7 +27,7 @@ impl InputBox {
             .title(" Search movie ");
 
         Paragraph::new(self.text.clone())
-            .style(Style::default().fg(Color::Yellow))
+            .style(Style::default().fg(Color::Gray))
             .block(block)
     }
 }

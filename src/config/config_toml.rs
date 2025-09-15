@@ -32,7 +32,7 @@ struct Opensubs {
 pub struct Config {
     pub yts_host: String,
     pub yts_download_dir: String,
-    pub yts_order: String,
+    pub yts_order: yts_movies::OrderBy,
     pub opensubs_lang: String,
     pub transmission_host: String,
     pub transmission_username: Option<String>,
@@ -51,7 +51,8 @@ impl From<ConfigToml> for Config {
                 config.yts_download_dir = download_dir;
             }
             if let Some(order) = yts.order {
-                config.yts_order = order;
+                config.yts_order = yts_movies::OrderBy::try_from(order.as_str())
+                    .unwrap_or_else(|_| panic!("Failed to convert '{order}' to YTS Order"));
             }
         }
 
@@ -84,7 +85,7 @@ impl Default for Config {
                     .to_str()
                     .expect("Error converting HOME var to string")
             ),
-            yts_order: "rating".to_string(),
+            yts_order: yts_movies::OrderBy::Rating,
             opensubs_lang: "es".to_string(),
             transmission_host: "http://127.0.0.1:9091/transmission/rpc".to_string(),
             transmission_username: None,
@@ -93,7 +94,7 @@ impl Default for Config {
     }
 }
 
-pub fn configuration() -> Config {
+pub fn configuration() -> anyhow::Result<Config> {
     let home_path = env::var_os("HOME").expect("No HOME variable set.");
 
     let config_path = format!(
@@ -103,9 +104,9 @@ pub fn configuration() -> Config {
     );
 
     if let Ok(toml) = fs::read_to_string(config_path) {
-        let config_toml: ConfigToml = toml::from_str(&toml).expect("Error parsing TOML");
-        config_toml.into()
+        let config_toml: ConfigToml = toml::from_str(&toml)?;
+        Ok(config_toml.into())
     } else {
-        Config::default()
+        Ok(Config::default())
     }
 }

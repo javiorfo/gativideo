@@ -6,8 +6,8 @@ use ratatui::{
 use transmission_rpc::{
     TransClient,
     types::{
-        Nothing, RpcResponse, Torrent, TorrentAction, TorrentAddArgs, TorrentAddedOrDuplicate,
-        TorrentGetField, TorrentStatus,
+        BasicAuth, Nothing, RpcResponse, Torrent, TorrentAction, TorrentAddArgs,
+        TorrentAddedOrDuplicate, TorrentGetField, TorrentStatus,
     },
 };
 
@@ -22,18 +22,30 @@ pub struct Transmission {
 }
 
 impl Transmission {
-    pub fn new(url: String, download_dir: String) -> Self {
+    pub fn new(
+        url: String,
+        username: Option<String>,
+        password: Option<String>,
+        download_dir: String,
+    ) -> anyhow::Result<Self> {
         let mut table_state = TableState::default();
         table_state.select_first();
         table_state.select_first_column();
 
-        Self {
-            client: TransClient::new(url.parse().expect("Could not parse transmission url")),
+        let client;
+        if let (Some(user), Some(password)) = (username, password) {
+            client = TransClient::with_auth(url.parse()?, BasicAuth { user, password });
+        } else {
+            client = TransClient::new(url.parse()?);
+        }
+
+        Ok(Self {
+            client,
             table_state,
             download_dir,
             scroll_state: ScrollbarState::default().position(1),
             torrents: Vec::new(),
-        }
+        })
     }
 
     pub fn is_visible(&self) -> bool {
@@ -48,7 +60,7 @@ impl Transmission {
         };
         let res: RpcResponse<TorrentAddedOrDuplicate> = self.client.torrent_add(add).await?;
 
-        self.scan().await;
+        self.scan().await?;
 
         Ok(res.is_ok())
     }
@@ -78,7 +90,7 @@ impl Transmission {
         Ok(res.is_ok())
     }
 
-    pub async fn scan(&mut self) {
+    pub async fn scan(&mut self) -> transmission_rpc::types::Result<()> {
         let torrents = self
             .client
             .torrent_get(
@@ -94,11 +106,12 @@ impl Transmission {
                 ]),
                 None,
             )
-            .await
-            .unwrap();
+            .await?;
 
         self.torrents.clear();
         self.torrents = torrents.arguments.torrents;
+
+        Ok(())
     }
 
     pub fn scroll_bar_up(&mut self) {
@@ -174,7 +187,7 @@ impl Transmission {
 
         let border_style = if matches!(focus, Focus::TorrentTable) {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Gray)
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)

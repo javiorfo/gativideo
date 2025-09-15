@@ -1,4 +1,3 @@
-use color_eyre::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout};
@@ -9,23 +8,28 @@ use crate::config::configuration;
 use crate::downloads::Transmission;
 use crate::elements::{Focus, InputBox, MovieTable, PopupTorrent};
 
-pub async fn run() -> Result<()> {
-    let config = configuration();
+pub async fn run() -> anyhow::Result<()> {
+    let config = configuration()?;
 
-    color_eyre::install()?;
+    color_eyre::install().map_err(anyhow::Error::msg)?;
 
     let mut terminal = ratatui::init();
 
     let mut focus = Focus::default();
     let mut input_box = InputBox::default();
-    let mut movie_table = MovieTable::default();
+    let mut movie_table = MovieTable::new(&config.yts_host, config.yts_order);
     let mut popup_torrent = PopupTorrent::new(" Torrents ", " Enter to download ");
-    let mut transmission = Transmission::new(config.transmission_host, config.yts_download_dir);
+    let mut transmission = Transmission::new(
+        config.transmission_host,
+        config.transmission_username,
+        config.transmission_password,
+        config.yts_download_dir,
+    )?;
 
     let mut last_redraw_time = tokio::time::Instant::now();
     let redraw_interval = tokio::time::Duration::from_secs(1);
 
-    transmission.scan().await;
+    transmission.scan().await.map_err(anyhow::Error::msg)?;
 
     loop {
         terminal.draw(|frame| {
@@ -41,8 +45,9 @@ pub async fn run() -> Result<()> {
 
         let time_since_last_redraw = tokio::time::Instant::now().duration_since(last_redraw_time);
         let timeout = redraw_interval.saturating_sub(time_since_last_redraw);
+
         if tokio::time::Instant::now().duration_since(last_redraw_time) >= redraw_interval {
-            transmission.scan().await;
+            transmission.scan().await.map_err(anyhow::Error::msg)?;
             last_redraw_time = tokio::time::Instant::now();
         }
 
@@ -55,7 +60,9 @@ pub async fn run() -> Result<()> {
                         focus = Focus::MovieTable;
                     }
                     KeyCode::Enter => {
-                        movie_table.search(&input_box.text).await.expect("");
+                        if let Err(e) = movie_table.search(&input_box.text).await {
+                            panic!("Error searching movies {e}");
+                        };
                         focus = Focus::MovieTable;
                     }
                     KeyCode::Char(c) => {
@@ -85,10 +92,14 @@ pub async fn run() -> Result<()> {
                     KeyCode::Char('j') | KeyCode::Down => movie_table.table_state.select_next(),
                     KeyCode::Char('k') | KeyCode::Up => movie_table.table_state.select_previous(),
                     KeyCode::Char('l') | KeyCode::Right => {
-                        movie_table.next_page(&input_box.text).await.expect("");
+                        if let Err(e) = movie_table.next_page(&input_box.text).await {
+                            panic!("Error getting next page {e}");
+                        }
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
-                        movie_table.previous_page(&input_box.text).await.expect("");
+                        if let Err(e) = movie_table.previous_page(&input_box.text).await {
+                            panic!("Error getting previous page {e}");
+                        }
                     }
                     KeyCode::Char('g') => movie_table.table_state.select_first(),
                     KeyCode::Char('G') => movie_table.table_state.select_last(),
@@ -97,7 +108,9 @@ pub async fn run() -> Result<()> {
                             && !movie_table.response.movies.is_empty()
                         {
                             let movie = &movie_table.response.movies[selected];
-                            popup_torrent.search_torrents(movie).await.unwrap();
+                            if let Err(e) = popup_torrent.search_torrents(movie).await {
+                                panic!("Error searching torrents {e}");
+                            }
 
                             popup_torrent.popup.show = true;
                             focus = Focus::TorrentPopup;
@@ -111,7 +124,10 @@ pub async fn run() -> Result<()> {
                         if let Some(selected) = transmission.table_state.selected()
                             && !transmission.torrents.is_empty()
                         {
-                            transmission.toggle(selected).await.unwrap();
+                            transmission
+                                .toggle(selected)
+                                .await
+                                .map_err(anyhow::Error::msg)?;
                         }
                     }
                     KeyCode::Char('q') | KeyCode::Esc => {
@@ -133,7 +149,10 @@ pub async fn run() -> Result<()> {
                         if let Some(selected) = transmission.table_state.selected()
                             && !transmission.torrents.is_empty()
                         {
-                            transmission.remove(selected).await.unwrap();
+                            transmission
+                                .remove(selected)
+                                .await
+                                .map_err(anyhow::Error::msg)?;
                         }
                     }
                     _ => {}
@@ -156,7 +175,10 @@ pub async fn run() -> Result<()> {
                     KeyCode::Enter => {
                         if let Some(selected) = popup_torrent.popup.table_state.selected() {
                             let torrent = &popup_torrent.torrents[selected];
-                            transmission.add(&torrent.link).await.unwrap();
+                            transmission
+                                .add(&torrent.link)
+                                .await
+                                .map_err(anyhow::Error::msg)?;
                         }
                         popup_torrent.popup.show = false;
                         focus = Focus::MovieTable;
