@@ -1,3 +1,9 @@
+use std::{
+    fs::File,
+    io::{self, Cursor},
+    path::Path,
+};
+
 use opensubs::{Filters, Language, OrderBy, Page, Response, SearchBy, Subtitle};
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
@@ -107,7 +113,7 @@ impl<'a> PopupTorrent<'a> {
             .map(|item| Row::new(item.iter().cloned()))
             .collect::<Vec<_>>();
 
-        let footer = format!(" {} file/s ", rows.len());
+        let footer = format!(" {} torrent/s ", rows.len());
 
         Table::new(rows, widths)
             .header(header)
@@ -145,29 +151,34 @@ pub struct PopupSubtitle<'a> {
     pub page: Page,
     languages: &'a [Language],
     order: OrderBy,
+    download_dir: &'a str,
 }
 
 impl<'a> PopupSubtitle<'a> {
-    pub fn new(languages: &'a [Language], order: OrderBy) -> PopupSubtitle<'a> {
+    pub fn new(
+        languages: &'a [Language],
+        order: OrderBy,
+        download_dir: &'a str,
+    ) -> PopupSubtitle<'a> {
         Self {
             popup: Popup::new(" Subtitles "),
             languages,
             order,
             subtitles: vec![],
-            page: Page {
-                from: 0,
-                to: 0,
-                total: 0,
-            },
+            download_dir,
+            page: Self::empty_page(),
         }
     }
 
     pub fn area(&self, area: Rect, y: u16) -> Rect {
         let y = y.min(self.subtitles.len() as u16) + 4;
-        self.popup.centered_area(area, 80, y)
+        self.popup.centered_area(area, 120, y)
     }
 
     pub async fn search_subtitles(&mut self, movie: &Movie) -> opensubs::Result {
+        self.subtitles.clear();
+        self.page = Self::empty_page();
+
         let name = &movie.name;
         let year = movie.year;
         let results = opensubs::search(SearchBy::MovieAndFilter(
@@ -200,12 +211,44 @@ impl<'a> PopupSubtitle<'a> {
         Ok(())
     }
 
+    pub async fn download_subtitle(&self, link: &str, movie_name: &str) -> anyhow::Result<()> {
+        let file_name = format!("{movie_name}.srt");
+        let output = Path::new(self.download_dir).join(&file_name);
+
+        let response = reqwest::get(link).await?;
+        let zip_bytes = response.bytes().await?.to_vec();
+
+        self.save_first_srt(&zip_bytes, &output)?;
+
+        Ok(())
+    }
+
+    fn save_first_srt(&self, zip_data: &[u8], output: &Path) -> Result<(), io::Error> {
+        let cursor = Cursor::new(zip_data);
+        let mut archive = zip::ZipArchive::new(cursor)?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            let file_name = file.name().to_owned();
+
+            if file.is_dir() || !file_name.to_lowercase().ends_with(".srt") {
+                continue;
+            }
+
+            let mut outfile = File::create(output)?;
+            io::copy(&mut file, &mut outfile)?;
+
+            return Ok(());
+        }
+        Ok(())
+    }
+
     pub fn render(&self) -> Table<'a> {
         let widths = [
             Constraint::Percentage(5),
-            Constraint::Percentage(30),
+            Constraint::Percentage(35),
             Constraint::Percentage(20),
-            Constraint::Percentage(10),
+            Constraint::Percentage(5),
             Constraint::Percentage(15),
             Constraint::Percentage(10),
             Constraint::Percentage(10),
@@ -271,15 +314,23 @@ impl<'a> PopupSubtitle<'a> {
             .highlight_symbol(" ")
     }
 
-    pub fn footer(&self) -> String {
+    fn footer(&self) -> String {
         let page = &self.page;
         if page.total != 0 {
             format!(
-                " {} file/s - From {} to {} ",
+                " {} subtitle/s - From {} to {} ",
                 page.total, page.from, page.to
             )
         } else {
-            String::from(" 0 file/s ")
+            String::from(" 0 subtitles ")
+        }
+    }
+
+    fn empty_page() -> Page {
+        Page {
+            from: 0,
+            to: 0,
+            total: 0,
         }
     }
 }
@@ -293,10 +344,10 @@ mod tests {
     #[tokio::test]
     async fn search_subtitles() {
         let mut popup_subtitle =
-            PopupSubtitle::new(&[Language::Spanish], opensubs::OrderBy::Rating);
+            PopupSubtitle::new(&[Language::Spanish], opensubs::OrderBy::Rating, "");
 
         let response = yts_movies::Yts::default()
-            .search("Holdovers")
+            .search("The Godfather")
             .await
             .unwrap();
 

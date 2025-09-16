@@ -19,12 +19,16 @@ pub async fn run() -> anyhow::Result<()> {
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::new(&config.yts_host, config.yts_order);
     let mut popup_torrent = PopupTorrent::new();
-    let mut popup_subtitle = PopupSubtitle::new(&config.opensubs_langs, config.opensubs_order);
+    let mut popup_subtitle = PopupSubtitle::new(
+        &config.opensubs_langs,
+        config.opensubs_order,
+        &config.yts_download_dir,
+    );
     let mut transmission = Transmission::new(
         config.transmission_host,
         config.transmission_username,
         config.transmission_password,
-        config.yts_download_dir,
+        config.yts_download_dir.clone(),
     )?;
 
     let mut last_redraw_time = tokio::time::Instant::now();
@@ -214,7 +218,17 @@ pub async fn run() -> anyhow::Result<()> {
                         popup_subtitle.popup.show = false;
                         focus = Focus::MovieTable;
                     }
-                    KeyCode::Enter => {}
+                    KeyCode::Enter => {
+                        if let Some(selected) = popup_subtitle.popup.table_state.selected() {
+                            let sub = &popup_subtitle.subtitles[selected];
+
+                            popup_subtitle
+                                .download_subtitle(&sub.download_link, &sub.movie)
+                                .await?;
+                        }
+                        popup_subtitle.popup.show = false;
+                        focus = Focus::MovieTable;
+                    }
                     _ => {}
                 },
             }
@@ -286,20 +300,21 @@ fn render(
         frame.render_widget(Clear, popup_area);
         frame.render_stateful_widget(popup_subtitle.render(), popup_area, &mut table_state);
 
-        let mut scroll_state = popup_subtitle
-            .popup
-            .scroll_state
-            .content_length(popup_subtitle.subtitles.len() + 2);
+        let len = popup_subtitle.subtitles.len();
 
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .symbols(scrollbar::VERTICAL)
-                .begin_symbol(None)
-                .track_symbol(None)
-                .end_symbol(None),
-            popup_area,
-            &mut scroll_state,
-        );
+        if len > 0 {
+            let mut scroll_state = popup_subtitle.popup.scroll_state.content_length(len + 2);
+
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .symbols(scrollbar::VERTICAL)
+                    .begin_symbol(None)
+                    .track_symbol(None)
+                    .end_symbol(None),
+                popup_area,
+                &mut scroll_state,
+            );
+        }
     }
 
     if visible {
