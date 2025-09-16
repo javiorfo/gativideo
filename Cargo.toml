@@ -7,7 +7,7 @@ authors = ["Javier Orfo <javierorfo@protonmail.com>"]
 license = "MIT"
 repository = "https://github.com/javiorfo/gativideo"
 homepage = "https://github.com/javiorfo/gativideo#readme"
-keywords = ["movies", "subtitles", "yts", "tui"]
+keywords = ["movies", "subtitles", "yts", "tui", "torrent", "transmission"]
 
 [dependencies]
 tokio = { version = "1.45.1", features = ["full"] }

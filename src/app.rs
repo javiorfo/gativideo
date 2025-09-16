@@ -67,7 +67,7 @@ pub async fn run() -> anyhow::Result<()> {
                     }
                     KeyCode::Enter => {
                         if let Err(e) = movie_table.search(&input_box.text).await {
-                            panic!("Error searching movies {e}");
+                            eprintln!("  Error searching movies {e}");
                         };
                         focus = Focus::MovieTable;
                     }
@@ -99,12 +99,12 @@ pub async fn run() -> anyhow::Result<()> {
                     KeyCode::Char('k') | KeyCode::Up => movie_table.table_state.select_previous(),
                     KeyCode::Char('l') | KeyCode::Right => {
                         if let Err(e) = movie_table.next_page(&input_box.text).await {
-                            panic!("Error getting next page {e}");
+                            eprintln!("  Error getting next page {e}");
                         }
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
                         if let Err(e) = movie_table.previous_page(&input_box.text).await {
-                            panic!("Error getting previous page {e}");
+                            eprintln!("  Error getting previous page {e}");
                         }
                     }
                     KeyCode::Char('g') => movie_table.table_state.select_first(),
@@ -115,7 +115,7 @@ pub async fn run() -> anyhow::Result<()> {
                         {
                             let movie = &movie_table.response.movies[selected];
                             if let Err(e) = popup_torrent.search_torrents(movie).await {
-                                panic!("Error searching torrents {e}");
+                                eprintln!("  Error searching torrents {e}");
                             }
 
                             popup_torrent.popup.show = true;
@@ -128,7 +128,7 @@ pub async fn run() -> anyhow::Result<()> {
                         {
                             let movie = &movie_table.response.movies[selected];
                             if let Err(e) = popup_subtitle.search_subtitles(movie).await {
-                                panic!("Error searching subtitles {e}");
+                                eprintln!("  Error searching subtitles {e}");
                             }
 
                             popup_subtitle.popup.show = true;
@@ -225,6 +225,8 @@ pub async fn run() -> anyhow::Result<()> {
                             popup_subtitle
                                 .download_subtitle(&sub.download_link, &sub.movie)
                                 .await?;
+
+                            println!("󰸞  Subtitle {}.srt downloaded", &sub.movie);
                         }
                         popup_subtitle.popup.show = false;
                         focus = Focus::MovieTable;

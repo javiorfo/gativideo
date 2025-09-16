@@ -1,5 +1,5 @@
 # gativideo
-*TUI app to download YTS movies and opensubtitles subtitles*
+*Minimal TUI app to download YTS movies and opensubtitles subtitles*
 
 ## Caveats
 - Rust version **1.88**
@@ -17,36 +17,73 @@ cargo install gativideo
 paru -S gativideo
 ```
 
-## Description
-- This program is a TUI wrapper of `YTS movies (a.k.a. yify)` and `opensubtitles.com (a.k.a. opensubtitles.org)`
-- It uses `transmission-rpc` protocol
-- You can search and download movies from `YTS` and search and download subtitles from `opensubtitles`. 
+## Details
+- This program is a TUI wrapper of `YTS movies (a.k.a. yify)` and [opensubtitles](https://opensubtitles.org) to search and download movies and subtitles. 
+- It uses `transmission-rpc` protocol. Transmission daemon must be configured in order to use **gativideo**
+    - [Transmission configuration](https://github.com/transmission/transmission/blob/main/docs/Editing-Configuration-Files.md)
+    - [Transmission How To](https://help.ubuntu.com/community/TransmissionHowTo)
 - This program serves itself from crates [yts-movies](https://github.com/javiorfo/yts-movies) and [opensubs](https://github.com/javiorfo/opensubs)
-- Some properties could be define in a file stored as `.config/gativideo/config.toml` [default values](https://github.com/javiorfo/gativideo/blob/master/example/config.toml)
+- Multiple movies at the time can be downloaded. You can close **gativideo** and the downloads still continue.
 
 ## Usage
-- Write the name of a movie and press `enter` to search
-- Use the `up` and `down` keys to navigate the movies table or the subtitles table
-- Use `l` to go to the next page
-- Use `h` to go to the previous page
-- Use `Ctrl+s` to toggle between movies table and subtitles table
-    - The subtitle is bound to the movie (if there is no subtitle for the movie, the subtitle table will be empty)
-- Use `Ctrl+d` to add a movie or a subtitle to download
-    - The subtitle will be download almost instantly 
-    - The movie will be added to an internal torrent client which will show the progress and peers connected
-- Use `Ctrl+r` to cancel download
-- Use `Ctrl+c` to exit **gativideo**
+#### Search movie
+- Write the name of a movie and press <kbd>Enter</kbd> to search
+- Use <kbd>Tab</kbd> to move focus between elements
+#### Movies table
+- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>l</kbd> to go to the next page
+- Use <kbd>h</kbd> to go to the previous page
+- Use <kbd>t</kbd> to open the torrent files popup table
+- Use <kbd>s</kbd> to open the subtitles files popup table
+- Use <kbd>Tab</kbd> to move focus between elements
+#### Popup torrents table
+- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>Enter</kbd> to start the torrent download
+- Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
+#### Popup subtitles table
+- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>Enter</kbd> to start the subtitle download
+- Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
+#### Download movies table
+- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>s</kbd> to toggle start/stop a download
+- Use <kbd>d</kbd> to delete the download
+- Use <kbd>Tab</kbd> to move focus between elements
 
-## Extra
-- The subtitle search is disabled by default. In case is needed, enable it and set the language using the **config.toml** [parameter](https://github.com/javiorfo/gativideo/blob/master/example/config.toml).
-- The subtitle search is bound to the movie. Nonetheless, download only the subtitles can be done.
-- Multiple movies at the time can be downloaded. You can close **gativideo** and the downloads still continue.
-    
+
+## Config example
+- Some properties could be define in a file stored as `$HOME/.config/gativideo/config.toml` [default values](https://github.com/javiorfo/gativideo/blob/master/example/config.toml)
+```toml
+[yts]
+# Default YTS Host if not set
+host = "https://en.yts-official.mx"
+# Default download dir "$HOME/Downloads" if not set
+download_dir = "/home/user/Downloads" 
+# Could be "rating" "oldest" "featured" "year" "likes" or "alphabetical" ("rating" is the default)
+order = "rating" 
+
+[opensubs]
+# Could be a list of languages ("spanish" is the default if not set)
+# All the languages are the available in opensubtitles.org 
+languages = [ "spanish", "french" ]
+# Ordered by "downloads", "uploaded" or "rating"
+order = "downloads" 
+
+[transmission]
+# Default Transmission RPC host (this is the default if not set)
+host = "http://127.0.0.1:9091/transmission/rpc"
+# If transmission rpc requires credentials
+username = "your_username"
+password = "your_password"
+```
+
 ## Demos and screenshots
 
 <img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-simple.gif?raw=true" alt="gativideo"/>
 
 #### Using filters
+- **year** filter could be: *from 1920 to 2025*
+- **rating** filter could be: *from 1 to 9*
 - **order** filter could be: *latest, oldest, rating, alphabetical, featured, year or likes*
 <img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-filters.gif?raw=true" alt="gativideo"/>
 
