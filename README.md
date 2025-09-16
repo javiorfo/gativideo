@@ -89,7 +89,8 @@ https://github.com/user-attachments/assets/a081ee6e-b77d-48d6-8b64-a923a441f5bb
 - **year** filter could be: *from 1920 to 2025*
 - **rating** filter could be: *from 1 to 9*
 - **order** filter could be: *latest, oldest, rating, alphabetical, featured, year or likes*
-<img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-filters.gif?raw=true" alt="gativideo"/>
+
+<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/gativideo3.png?raw=true" alt="gativideo"/>
 
 ---
 
