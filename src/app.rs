@@ -6,7 +6,9 @@ use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use crate::config::configuration;
 use crate::downloads::Transmission;
-use crate::elements::{Focus, InputBox, MovieTable, PopupSubtitle, PopupTorrent};
+use crate::elements::{
+    Focus, InputBox, MovieTable, PopupNotification, PopupSubtitle, PopupTorrent,
+};
 
 pub async fn run() -> anyhow::Result<()> {
     let config = configuration()?;
@@ -19,11 +21,13 @@ pub async fn run() -> anyhow::Result<()> {
     let mut input_box = InputBox::default();
     let mut movie_table = MovieTable::new(&config.yts_host, config.yts_order);
     let mut popup_torrent = PopupTorrent::new();
+    let mut popup_notification = PopupNotification::new();
     let mut popup_subtitle = PopupSubtitle::new(
         &config.opensubs_langs,
         config.opensubs_order,
         &config.yts_download_dir,
     );
+
     let mut transmission = Transmission::new(
         config.transmission_host,
         config.transmission_username,
@@ -45,6 +49,7 @@ pub async fn run() -> anyhow::Result<()> {
                 &input_box,
                 &popup_torrent,
                 &popup_subtitle,
+                &popup_notification,
                 &mut transmission,
             )
         })?;
@@ -67,9 +72,12 @@ pub async fn run() -> anyhow::Result<()> {
                     }
                     KeyCode::Enter => {
                         if let Err(e) = movie_table.search(&input_box.text).await {
-                            eprintln!("  Error searching movies {e}");
-                        };
-                        focus = Focus::MovieTable;
+                            popup_notification.text = format!("  Error searching movies {e}");
+                            popup_notification.show = true;
+                            focus = Focus::PopupNotification;
+                        } else {
+                            focus = Focus::MovieTable;
+                        }
                     }
                     KeyCode::Char(c) => {
                         input_box.text.push(c);
@@ -99,12 +107,16 @@ pub async fn run() -> anyhow::Result<()> {
                     KeyCode::Char('k') | KeyCode::Up => movie_table.table_state.select_previous(),
                     KeyCode::Char('l') | KeyCode::Right => {
                         if let Err(e) = movie_table.next_page(&input_box.text).await {
-                            eprintln!("  Error getting next page {e}");
+                            popup_notification.text = format!("  Error getting next page {e}");
+                            popup_notification.show = true;
+                            focus = Focus::PopupNotification;
                         }
                     }
                     KeyCode::Char('h') | KeyCode::Left => {
                         if let Err(e) = movie_table.previous_page(&input_box.text).await {
-                            eprintln!("  Error getting previous page {e}");
+                            popup_notification.text = format!("  Error getting previous page {e}");
+                            popup_notification.show = true;
+                            focus = Focus::PopupNotification;
                         }
                     }
                     KeyCode::Char('g') => movie_table.table_state.select_first(),
@@ -115,11 +127,14 @@ pub async fn run() -> anyhow::Result<()> {
                         {
                             let movie = &movie_table.response.movies[selected];
                             if let Err(e) = popup_torrent.search_torrents(movie).await {
-                                eprintln!("  Error searching torrents {e}");
+                                popup_notification.text =
+                                    format!("  Error searching torrents {e}");
+                                popup_notification.show = true;
+                                focus = Focus::PopupNotification;
+                            } else {
+                                popup_torrent.popup.show = true;
+                                focus = Focus::PopupTorrent;
                             }
-
-                            popup_torrent.popup.show = true;
-                            focus = Focus::PopupTorrent;
                         }
                     }
                     KeyCode::Char('s') => {
@@ -128,11 +143,14 @@ pub async fn run() -> anyhow::Result<()> {
                         {
                             let movie = &movie_table.response.movies[selected];
                             if let Err(e) = popup_subtitle.search_subtitles(movie).await {
-                                eprintln!("  Error searching subtitles {e}");
+                                popup_notification.text =
+                                    format!("  Error searching subtitles {e}");
+                                popup_notification.show = true;
+                                focus = Focus::PopupNotification;
+                            } else {
+                                popup_subtitle.popup.show = true;
+                                focus = Focus::PopupSubtitle;
                             }
-
-                            popup_subtitle.popup.show = true;
-                            focus = Focus::PopupSubtitle;
                         }
                     }
                     _ => {}
@@ -199,7 +217,7 @@ pub async fn run() -> anyhow::Result<()> {
                                 .map_err(anyhow::Error::msg)?;
                         }
                         popup_torrent.popup.show = false;
-                        focus = Focus::TorrentTable;
+                        focus = Focus::MovieTable;
                     }
                     _ => {}
                 },
@@ -226,9 +244,18 @@ pub async fn run() -> anyhow::Result<()> {
                                 .download_subtitle(&sub.download_link, &sub.movie)
                                 .await?;
 
-                            println!("󰸞  Subtitle {}.srt downloaded", &sub.movie);
+                            popup_notification.text =
+                                format!("󰸞  Subtitle {}.srt downloaded", &sub.movie);
                         }
                         popup_subtitle.popup.show = false;
+                        popup_notification.show = true;
+                        focus = Focus::PopupNotification;
+                    }
+                    _ => {}
+                },
+                Focus::PopupNotification => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        popup_notification.show = false;
                         focus = Focus::MovieTable;
                     }
                     _ => {}
@@ -238,6 +265,7 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render(
     frame: &mut Frame,
     movie_table: &mut MovieTable,
@@ -245,6 +273,7 @@ fn render(
     input_box: &InputBox,
     popup_torrent: &PopupTorrent,
     popup_subtitle: &PopupSubtitle,
+    popup_notification: &PopupNotification,
     transmission: &mut Transmission,
 ) {
     let mut movie_table_state = movie_table.table_state;
@@ -273,6 +302,12 @@ fn render(
     }
 
     frame.render_stateful_widget(table, movie_table_area, &mut movie_table_state);
+
+    if popup_notification.show {
+        let popup_area = popup_notification.area(movie_table_area);
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup_notification.render(), popup_area);
+    }
 
     if popup_torrent.popup.show {
         let popup_area = popup_torrent.area(movie_table_area);

@@ -83,7 +83,7 @@ password = "your_password"
 
 ## Demos and screenshots
 
-<img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-simple.gif?raw=true" alt="gativideo"/>
+https://github.com/user-attachments/assets/a081ee6e-b77d-48d6-8b64-a923a441f5bb
 
 #### Using filters
 - **year** filter could be: *from 1920 to 2025*

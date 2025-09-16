@@ -8,7 +8,7 @@ use opensubs::{Filters, Language, OrderBy, Page, Response, SearchBy, Subtitle};
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Row, ScrollbarState, Table, TableState},
+    widgets::{Block, BorderType, Borders, Paragraph, Row, ScrollbarState, Table, TableState},
 };
 use yts_movies::{Movie, Torrent, Yts};
 
@@ -53,6 +53,40 @@ impl<'a> Popup<'a> {
         if len > 0 && position < len - 1 {
             self.scroll_state = self.scroll_state.position(position.saturating_add(1));
         }
+    }
+}
+
+pub struct PopupNotification {
+    pub text: String,
+    pub show: bool,
+}
+
+impl PopupNotification {
+    pub fn new() -> PopupNotification {
+        Self {
+            text: String::new(),
+            show: false,
+        }
+    }
+
+    pub fn area(&self, area: Rect) -> Rect {
+        let vertical = Layout::vertical([Constraint::Length(3)]).flex(Flex::Center);
+        let horizontal =
+            Layout::horizontal([Constraint::Length(self.text.len() as u16)]).flex(Flex::Center);
+        let [area] = area.layout(&vertical);
+        let [area] = area.layout(&horizontal);
+        area
+    }
+
+    pub fn render(&self) -> Paragraph<'_> {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain)
+            .title(" Notification ");
+
+        Paragraph::new(self.text.clone())
+            .style(Style::default().fg(Color::White))
+            .block(block)
     }
 }
 
