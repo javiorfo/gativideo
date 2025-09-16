@@ -7,7 +7,7 @@ authors = ["Javier Orfo <javierorfo@protonmail.com>"]
 license = "MIT"
 repository = "https://github.com/javiorfo/gativideo"
 homepage = "https://github.com/javiorfo/gativideo#readme"
-keywords = ["movies", "subtitles", "yts", "tui", "torrent", "transmission"]
+keywords = ["movies", "subtitles", "tui", "torrent", "transmission"]
 rust-version = "1.88"
 
 [dependencies]
