@@ -30,22 +30,22 @@ paru -S gativideo
 - Write the name of a movie and press <kbd>Enter</kbd> to search
 - Use <kbd>Tab</kbd> to move focus between elements
 #### Movies table
-- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
 - Use <kbd>l</kbd> to go to the next page
 - Use <kbd>h</kbd> to go to the previous page
 - Use <kbd>t</kbd> to open the torrent files popup table
 - Use <kbd>s</kbd> to open the subtitles files popup table
 - Use <kbd>Tab</kbd> to move focus between elements
 #### Popup torrents table
-- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
 - Use <kbd>Enter</kbd> to start the torrent download
 - Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
 #### Popup subtitles table
-- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
 - Use <kbd>Enter</kbd> to start the subtitle download
 - Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
 #### Download movies table
-- Use <kbd> </kbd> or <kbd>k</kbd> and <kbd> </kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
 - Use <kbd>s</kbd> to toggle start/stop a download
 - Use <kbd>d</kbd> to delete the download
 - Use <kbd>Tab</kbd> to move focus between elements
