@@ -1,62 +1,91 @@
-# bitsmuggler
-*TUI app to download YTS movies and opensubtitles subs*
+# gativideo
+*Minimal TUI app to download YTS movies and opensubtitles subtitles*
 
 ## Caveats
-- Go version **1.24**
+- Rust version **1.88**
+- It's upon `transmission-rpc` protocol. So It requires to be active in order to use gativideo. 
 - This program has been developed on and for Linux following open source philosophy.
 
-<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler.png?raw=true" alt="bitsmuggler"/>
-
 ## Installation
-- Using Go
+- Using Cargo
 ```bash
-go install github.com/javiorfo/bitsmuggler@latest
-```
-
-- Downloading, compiling and installing manually (Linux):
-```bash
-git clone https://github.com/javiorfo/bitsmuggler
-cd bitsmuggler
-sudo make clean install
+cargo install gativideo
 ```
 
 - From AUR Arch Linux:
 ```bash
-yay -S bitsmuggler
+paru -S gativideo
 ```
 
-## Description
-- This program is a kind of TUI wrapper of `YTS movies (a.k.a. yify)` server and `opensubtitles.com (a.k.a. opensubtitles.org)`
-- You can search and download movies from `YTS` server and search and download subtitles from `opensubtitles` server
-- Some properties could be define in a file stored as `.config/bitsmuggler/config.toml` [default values](https://github.com/javiorfo/bitsmuggler/blob/master/example/config.toml)
+## Details
+- This program is a TUI wrapper of `YTS movies (a.k.a. yify)` and [opensubtitles](https://opensubtitles.org) to search and download movies and subtitles. 
+- It uses `transmission-rpc` protocol. Transmission daemon must be configured in order to use **gativideo**
+    - [Transmission configuration](https://github.com/transmission/transmission/blob/main/docs/Editing-Configuration-Files.md)
+    - [Transmission How To](https://help.ubuntu.com/community/TransmissionHowTo)
+- This program serves itself from crates [yts-movies](https://github.com/javiorfo/yts-movies) and [opensubs](https://github.com/javiorfo/opensubs)
+- Multiple movies at the time can be downloaded. You can close **gativideo** and the downloads still continue.
 
 ## Usage
-- When **bitsmuggler** is executed it will search the latest movies ordered by rating 
-- Write the name of a movie and press `enter` to search
-- Use the `up` and `down` keys to navigate the movies table or the subtitles table
-- Use `Ctrl+n` to go to the next page
-- Use `Ctrl+p` to go to the previous page
-- Use `Ctrl+s` to toggle between movies table and subtitles table
-    - The subtitle is bound to the movie (if there is no subtitle for the movie, the subtitle table will be empty)
-- Use `Ctrl+d` to add a movie or a subtitle to download
-    - The subtitle will be download almost instantly 
-    - The movie will be added to an internal torrent client which will show the progress and peers connected
-- Use `Ctrl+r` to cancel download
-- Use `Ctrl+c` to exit **bitsmuggler**
+#### Search movie
+- Write the name of a movie and press <kbd>Enter</kbd> to search
+- Use <kbd>Tab</kbd> to move focus between elements
+#### Movies table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>l</kbd> to go to the next page
+- Use <kbd>h</kbd> to go to the previous page
+- Use <kbd>t</kbd> to open the torrent files popup table
+- Use <kbd>s</kbd> to open the subtitles files popup table
+- Use <kbd>Tab</kbd> to move focus between elements
+#### Popup torrents table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>Enter</kbd> to start the torrent download
+- Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
+#### Popup subtitles table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>Enter</kbd> to start the subtitle download
+- Use <kbd>q</kbd> or <kbd>Esc</kbd> to close the popup
+#### Download movies table
+- Use <kbd>up</kbd> or <kbd>k</kbd> and <kbd>down</kbd> or <kbd>j</kbd> keys to navigate the table
+- Use <kbd>s</kbd> to toggle start/stop a download
+- Use <kbd>d</kbd> to delete the download
+- Use <kbd>Tab</kbd> to move focus between elements
 
-## Extra
-- The subtitle search is disabled by default. In case is needed, enable it and set the language using the **config.toml** [parameter](https://github.com/javiorfo/bitsmuggler/blob/master/example/config.toml).
-- The subtitle search is bound to the movie. Nonetheless, you can download only the subtitles.
-- Only one movie at the time could be downloaded. You can close **bitsmuggler** and when you open it again It will resume the incomplete download and finish it unless it is canceled by the user.
-- The quality selected by default is **1080** but could be modified in the config.toml file. Using 2160, 1080 or 720 (A fallback is used from mayor to minor. Ex: If 2160 is set and not found, it will search 1080 and so on).
-    
+
+## Config example
+- Some properties could be define in a file stored as `$HOME/.config/gativideo/config.toml` [default values](https://github.com/javiorfo/gativideo/blob/master/example/config.toml)
+```toml
+[yts]
+# Default YTS Host if not set
+host = "https://en.yts-official.mx"
+# Default download dir "$HOME/Downloads" if not set
+download_dir = "/home/user/Downloads" 
+# Could be "rating" "oldest" "featured" "year" "likes" or "alphabetical" ("rating" is the default)
+order = "rating" 
+
+[opensubs]
+# Could be a list of languages ("spanish" is the default if not set)
+# All the languages are the available in opensubtitles.org 
+languages = [ "spanish", "french" ]
+# Ordered by "downloads", "uploaded" or "rating"
+order = "downloads" 
+
+[transmission]
+# Default Transmission RPC host (this is the default if not set)
+host = "http://127.0.0.1:9091/transmission/rpc"
+# If transmission rpc requires credentials
+username = "your_username"
+password = "your_password"
+```
+
 ## Demos and screenshots
 
-<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler-simple.gif?raw=true" alt="bitsmuggler"/>
+<img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-simple.gif?raw=true" alt="gativideo"/>
 
 #### Using filters
+- **year** filter could be: *from 1920 to 2025*
+- **rating** filter could be: *from 1 to 9*
 - **order** filter could be: *latest, oldest, rating, alphabetical, featured, year or likes*
-<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/bitsmuggler-filters.gif?raw=true" alt="bitsmuggler"/>
+<img src="https://github.com/javiorfo/img/blob/master/gativideo/gativideo-filters.gif?raw=true" alt="gativideo"/>
 
 ---
 
