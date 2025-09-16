@@ -6,6 +6,10 @@
 - It's upon `transmission-rpc` protocol. So It requires to be active in order to use gativideo. 
 - This program has been developed on and for Linux following open source philosophy.
 
+<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/gativideo.png?raw=true" alt="gativideo"/>
+
+<img src="https://github.com/javiorfo/img/blob/master/bitsmuggler/gativideo2.png?raw=true" alt="gativideo"/>
+
 ## Installation
 - Using Cargo
 ```bash
