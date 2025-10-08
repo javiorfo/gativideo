@@ -1,6 +1,6 @@
 [package]
 name = "gativideo"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "TUI app to download YTS movies and opensubtitles subtitles"
 authors = ["Javier Orfo <javierorfo@protonmail.com>"]
@@ -21,5 +21,5 @@ transmission-rpc = "0.5.0"
 anyhow = "1.0.99"
 toml = "0.9.5"
 zip = "0.6"
-opensubs = "0.1.3"
-yts-movies = "0.2.0"
+opensubs = "0.1.4"
+yts-movies = "0.2.1"
