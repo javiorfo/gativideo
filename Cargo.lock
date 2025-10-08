@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "gativideo"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "color-eyre",
@@ -2765,9 +2765,7 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "slab",
  "socket2",
  "tokio-macros",
