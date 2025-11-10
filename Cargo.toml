@@ -1,6 +1,6 @@
 [package]
 name = "gativideo"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "TUI app to download YTS movies and opensubtitles subtitles"
 authors = ["Javier Orfo <javierorfo@protonmail.com>"]
@@ -11,7 +11,7 @@ keywords = ["movies", "subtitles", "tui", "torrent", "transmission"]
 rust-version = "1.88"
 
 [dependencies]
-tokio = { version = "1.45.1", features = ["macros", "rt", "time"] }
+tokio = { version = "1.45.1", features = ["macros", "rt", "time", "rt-multi-thread"] }
 reqwest = { version = "0.12.20", features = ["json"] }
 ratatui = { version = "0.30.0-alpha.5", features = ["all-widgets"] }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -21,5 +21,5 @@ transmission-rpc = "0.5.0"
 anyhow = "1.0.99"
 toml = "0.9.5"
 zip = "0.6"
-opensubs = "0.1.4"
-yts-movies = "0.2.1"
+opensubs = "0.1.5"
+yts-movies = "0.2.2"
