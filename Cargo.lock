@@ -3481,9 +3481,9 @@ dependencies = [
 
 [[package]]
 name = "yts-movies"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b800d5bcf859da1c0578f3aa99bfc09456c8bfaa41c953280304c2c8771fdfc"
+checksum = "ed3c5d685a3cdd9b2670ed33f4d052b520cf8538c1973cef743c6ac34950db68"
 dependencies = [
  "reqwest",
  "scraper",

@@ -95,7 +95,7 @@ impl From<ConfigToml> for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            yts_host: "https://en.yts-official.mx".to_string(),
+            yts_host: "https://yts.lt".to_string(),
             yts_download_dir: format!(
                 "{}/Downloads",
                 env::var_os("HOME")
